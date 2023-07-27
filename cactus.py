@@ -32,10 +32,10 @@ class CactusGroup:
             my_q -= 1
             return_permutation = list(range(0,self.index))
             halfway = (my_q-my_p)//2+1
-            for idx in range(0,halfway):
-                if my_p+idx>=my_q-idx:
+            for help_idx in range(0,halfway):
+                if my_p+help_idx>=my_q-help_idx:
                     break
-                return_permutation[my_p+idx], return_permutation[my_q-idx] = return_permutation[my_q-idx],return_permutation[my_p+idx]
+                return_permutation[my_p+help_idx], return_permutation[my_q-help_idx] = return_permutation[my_q-help_idx],return_permutation[my_p+help_idx]
             return return_permutation
         def perm_multiply_0(perm_1 : List[int],perm_2 : List[int]) -> List[int]:
             """

@@ -535,5 +535,5 @@ if __name__ == '__main__':
     assert qrep.vertex_dims == {0:2}
     ginz_cubic_mat = qrep.mat_from_path_alg(ginz_cubic)
     print(ginz_cubic_mat)
-    exp_ginz_cubic_mat = [[-1,0],[0,1]]
+    exp_ginz_cubic_mat = (edge_dict["a"]*edge_dict["adag"] - edge_dict["adag"]*edge_dict["a"])*edge_dict["omega"]
     assert all(((ginz_cubic_mat[idx][jdx] == exp_ginz_cubic_mat[idx][jdx] for idx in [0,1]) for jdx in [0,1]))

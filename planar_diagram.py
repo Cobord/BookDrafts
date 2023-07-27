@@ -2,7 +2,8 @@
 diagrams used in the sense of cluster algebra
 """
 
-from typing import Iterator, List, Set, Tuple, TypeVar, Union, runtime_checkable, Protocol
+from typing import Iterator, List, Set, Tuple, TypeVar, Union
+from typing import runtime_checkable, Protocol, Any, cast
 import itertools
 from functools import reduce
 import networkx as nx
@@ -51,7 +52,7 @@ class PlanarNetwork(nx.DiGraph):
                               f"{to_node}_{to_number}", weight=cur_weight)
         self.sink_number = sink_number
 
-    def path_weight(self, path_nodes) -> WeightType:
+    def path_weight(self, path_nodes : List[Any]) -> WeightType:
         """
         multiply the weights for the path that connects all the path_nodes
         """
@@ -97,7 +98,7 @@ class PlanarNetwork(nx.DiGraph):
             path_collection_iterator = itertools.product(*ij_paths)
             # now path_collection is a tuple of k paths that fully connect i_set to j_set
             for path_collection in path_collection_iterator:
-                seen_vertices = set({})
+                seen_vertices : Set[Nat] = set({})
                 is_vertex_disjoint = True
                 my_paths = []
                 for path in path_collection:
@@ -152,7 +153,7 @@ class Ordered(Protocol):
     protocol for ordered
     """
 
-    def __leq__(self, other): ...
+    def __leq__(self, _other): ...
 
 
 V = TypeVar('V', bound=Ordered)
@@ -225,7 +226,7 @@ if __name__ == "__main__":
         [D, D*H, D*H*I], [B*D, B*D*H+E, B*D*H*I+E*(G+I)], [A*B*D, A*B*D*H+(A+C)*E, A*B*D*H*I+(A+C)*E*(G+I)+F]]
     for i in range(1, 4):
         for j in range(1, 4):
-            w_ij: Expr = p.weight_matrix(i, j)
+            w_ij = cast(Expr,p.weight_matrix(i, j))
             w_ij = w_ij.subs({ZERO: 0.0, ONE: 1.0})
             print(f"a_({i},{j}) = {w_ij}")
             assert w_ij.equals(expected_weight_matrix[i-1][j-1])
@@ -233,7 +234,7 @@ if __name__ == "__main__":
     for weight in p.vertex_disjoint_collection({2, 3}, {2, 3}):
         print(f"\t{weight}")
     print("Doing Lindstrom")
-    delta_23_23: Expr = p.lindstrom_minor({2, 3}, {2, 3})
+    delta_23_23 = cast(Expr,p.lindstrom_minor({2, 3}, {2, 3}))
     delta_23_23 = delta_23_23.subs({ZERO: 0.0, ONE: 1.0})
     print(f"Delta_23,23 = {delta_23_23}")
     expected = (B*C*D*E*G*H + B*D*F*H + E*F)*1.0
@@ -245,7 +246,7 @@ if __name__ == "__main__":
                             ZERO,-ONE)
     assert expected_2 == expected
 
-    delta_123_123: Expr = p.lindstrom_minor({2, 3, 1}, {1, 2, 3})
+    delta_123_123 = cast(Expr,p.lindstrom_minor({2, 3, 1}, {1, 2, 3}))
     delta_123_123 = delta_123_123.subs({ZERO: 0.0, ONE: 1.0})
     print(f"Delta_123,123 = {delta_123_123}")
     expected_determinant = determinant(expected_weight_matrix,
