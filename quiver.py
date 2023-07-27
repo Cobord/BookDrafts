@@ -3,11 +3,13 @@ quiver path algebra computations
 """
 
 from functools import reduce
-from typing import Callable, Dict, List, Optional, Set,Tuple, Union
+from typing import Callable, Dict, List, Optional, Set,Tuple, Union, cast
 import numpy as np
 
 # pylint:disable = unnecessary-lambda, unnecessary-lambda-assignment,too-many-instance-attributes
 # pylint:disable = line-too-long, invalid-name, no-member, protected-access, no-else-return
+# mypy: ignore-errors
+# pyright: ignore[reportUndefinedVariable]
 
 Nat = int
 VertexLabel = Nat
@@ -18,7 +20,7 @@ class Quiver:
     a set of vertices and edges
     the vertices and edges have names and monotonically increasing indices
     """
-    def __init__(self):
+    def __init__(self) -> None:
         """
         empty quiver
         """
@@ -26,10 +28,11 @@ class Quiver:
         self.edges : List[Tuple[VertexLabel,VertexLabel]] = []
         self.next_vertex_label : VertexLabel = 0
         self.next_edge_label : EdgeLabel = 0
-        self.edges_from : Dict[EdgeLabel,VertexLabel] = {}
-        self.edges_to : Dict[EdgeLabel,VertexLabel] = {}
-        self.edge_names = {}
-        self.vertex_names = {}
+        self.edges_from : Dict[VertexLabel,List[EdgeLabel]] = {}
+        self.edges_to : Dict[VertexLabel,List[EdgeLabel]] = {}
+        self.edge_names : Dict[EdgeLabel,str] = {}
+        self.vertex_names : Dict[VertexLabel,str] = {}
+
     def add_vertex(self, name : str) -> Nat:
         """
         add a vertex not connected to anything else
@@ -90,14 +93,14 @@ class QuiverRepresentation:
     a quiver representation has a quiver
     and matrices for each of the edges
     """
-    def __init__(self, quiver: Quiver, edge_matrices : Dict[str,np.array]):
+    def __init__(self, quiver: Quiver, edge_matrices : Dict[str,np.ndarray]):
         """
         give the quiver and a dictionary whose keys are the names of the edges
         and values are associated matrices for that single edge
         """
         self._my_quiver = quiver
-        self._edge_matrices = edge_matrices
-        self.vertex_dims = {}
+        self._edge_matrices : Dict[str,np.ndarray] = edge_matrices
+        self.vertex_dims : Dict[VertexLabel,Nat] = {}
         edge_names_needed = set(quiver.edge_names.values())
         for k,v in edge_matrices.items():
             (rows,cols) = v.shape
@@ -124,13 +127,14 @@ class QuiverRepresentation:
         if len(edge_names_needed)>0:
             raise ValueError("Not all the edges had a matrix specified")
 
-    def mat_from_path_alg(self,potential : 'PathAlgebra') -> np.array:
+    def mat_from_path_alg(self,potential : 'PathAlgebra') -> np.ndarray:
         """
         the matrix from a formal linear combination of paths in the quiver
         """
         assert self._my_quiver == potential._quiver
-        return sum((np.multiply(self.to_matrix(k),v) for (k,v) in potential.element.element.items()))
-    def to_matrix(self,word : str) -> np.array:
+        return reduce(lambda z,w: z+w,(np.multiply(self.to_matrix(k),v) for (k,v) in potential.element.element.items()))
+
+    def to_matrix(self,word : str) -> np.ndarray:
         """
         the matrix from a path in the quiver presented as a ; separated string of edge names
         """
@@ -139,7 +143,9 @@ class QuiverRepresentation:
             raise ValueError("Only for paths of nonzero length")
         return reduce(lambda acc,edge_name: np.matmul(acc,self._edge_matrices[edge_name]),factors[1:],self._edge_matrices[factors[0]])
 
-def FormalLinearCombination(t : type, base_ring : type, zero_base_ring : 'base_ring', ts_mul : Callable[['t','t'],'t']):
+def FormalLinearCombination(t : type, base_ring : type,
+                            zero_base_ring : 'base_ring',
+                            ts_mul : Callable[['t','t'],'t']):
     """
     t is any type, if you want __mul__ to have meaning then you have to say it is a semigroup with the provided ts_mul for t's multiplication
        if you don't intend to call __mul__ ever you can put something dummy there like ts_mul = lambda z1,z2 = z2, but it will never be utilized
@@ -316,8 +322,10 @@ class PathAlgebra:
         if len(factors)==0:
             raise ValueError("Only for paths of nonzero length")
         for (edge_before_name,edge_now_name) in zip(factors,factors[1:]):
-            (_edge_before_src,edge_before_tgt) = self._quiver.edges[self._quiver.from_edge_name(edge_before_name)]
-            (edge_now_src,_edge_now_tgt) = self._quiver.edges[self._quiver.from_edge_name(edge_now_name)]
+            edge_before_idx = cast(Nat,self._quiver.from_edge_name(edge_before_name))
+            (_edge_before_src,edge_before_tgt) = self._quiver.edges[edge_before_idx]
+            edge_now_idx = cast(Nat,self._quiver.from_edge_name(edge_now_name))
+            (edge_now_src,_edge_now_tgt) = self._quiver.edges[edge_now_idx]
             if edge_now_src!=edge_before_tgt:
                 return False
         return True
@@ -332,9 +340,11 @@ class PathAlgebra:
                 raise ValueError("Each summand should have nonzero length")
             first_edge_name = factors[0]
             last_edge_name = factors[-1]
-            (first_edge_src,_first_edge_tgt) = self._quiver.edges[self._quiver.from_edge_name(first_edge_name)]
-            (_last_edge_src,last_edge_tgt) = self._quiver.edges[self._quiver.from_edge_name(last_edge_name)]
-            if first_edge_src!=last_edge_tgt and v!=self.base_ring_zero and self.is_nonzero(k):
+            edge_first_idx = cast(Nat,self._quiver.from_edge_name(first_edge_name))
+            (first_edge_src,_first_edge_tgt) = self._quiver.edges[edge_first_idx]
+            edge_last_idx = cast(Nat,self._quiver.from_edge_name(last_edge_name))
+            (_last_edge_src,last_edge_tgt) = self._quiver.edges[edge_last_idx]
+            if first_edge_src!=last_edge_tgt and v!=complex(0,0) and self.is_nonzero(k):
                 return False
         return True
     def split_cyclic(self) -> Tuple['PathAlgebra','PathAlgebra']:
@@ -352,8 +362,10 @@ class PathAlgebra:
                 raise ValueError("Each summand should have nonzero length")
             first_edge_name = factors[0]
             last_edge_name = factors[-1]
-            (first_edge_src,_first_edge_tgt) = self._quiver.edges[self._quiver.from_edge_name(first_edge_name)]
-            (_last_edge_src,last_edge_tgt) = self._quiver.edges[self._quiver.from_edge_name(last_edge_name)]
+            first_edge_idx = cast(Nat,self._quiver.from_edge_name(first_edge_name))
+            (first_edge_src,_first_edge_tgt) = self._quiver.edges[first_edge_idx]
+            last_edge_idx = cast(Nat,self._quiver.from_edge_name(last_edge_name))
+            (_last_edge_src,last_edge_tgt) = self._quiver.edges[last_edge_idx]
             if first_edge_src==last_edge_tgt:
                 cyclic_part += FLC_class([(v,k)])
             else:
@@ -413,12 +425,14 @@ class PathAlgebra:
             ret_val = PathAlgebra(self._quiver,[])
             ret_val.element = new_element
             return ret_val
-        assert self._quiver==other._quiver
-        new_element = self.element * other.element
-        new_element.remove_zero_terms(lambda k : self.is_nonzero(k))
-        ret_val = PathAlgebra(self._quiver,[])
-        ret_val.element = new_element
-        return ret_val
+        if isinstance(other, PathAlgebra):
+            assert self._quiver==other._quiver
+            new_element = self.element * other.element
+            new_element.remove_zero_terms(lambda k : self.is_nonzero(k))
+            ret_val = PathAlgebra(self._quiver,[])
+            ret_val.element = new_element
+            return ret_val
+        raise TypeError("other is neither a scalar nor another element of the path algebra")
 
     def __imul__(self,other:Union['PathAlgebra' , float , int , complex]):
         """
@@ -436,10 +450,12 @@ class PathAlgebra:
             scalar_mult = True
         if scalar_mult:
             self.element *= other_complex
-        else:
+        elif isinstance(other,PathAlgebra):
             assert self._quiver==other._quiver
             self.element *= other.element
             self.element.remove_zero_terms(lambda k : self.is_nonzero(k))
+        else:
+            raise TypeError("other is neither a scalar nor another element of the path algebra")
         return self
     def __repr__(self):
         """

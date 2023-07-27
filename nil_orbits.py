@@ -3,8 +3,9 @@ nilpotent orbits
 Bala-Carter
 """
 
+from __future__ import annotations
 from enum import Enum, auto
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
 Nat = int
 
@@ -15,16 +16,19 @@ class YoungDiagram:
     """
 
     @classmethod
-    def next_partition(cls, n: int, m: Optional[int] = None):
+    def next_partition(cls, partition_sum: int,
+                       max_part: Optional[int] = None) -> Iterator[YoungDiagram]:
         """Partition n with a maximum part size of m."""
-        if n < 0:
+        if partition_sum < 0:
             raise ValueError("n must be non-negative")
-        if m is None or m >= n:
-            yield YoungDiagram([n])
-        top_of_range = n-1 if (m is None or m >= n) else m
+        if max_part is None or max_part >= partition_sum:
+            yield YoungDiagram([partition_sum])
+        top_of_range = partition_sum-1\
+            if (max_part is None or max_part >= partition_sum)\
+            else max_part
         for new_m in range(top_of_range, 0, -1):
-            for p in YoungDiagram.next_partition(n-new_m, new_m):
-                yield p.append(new_m)
+            for p_next in YoungDiagram.next_partition(partition_sum-new_m, new_m):
+                yield p_next.append(new_m)
 
     def __init__(self, my_partition: List[int]):
         """
@@ -98,7 +102,9 @@ class NilpotentOrbit:
     where g is one of A,B,C,D _n
     """
 
-    def __init__(self, my_partition: 'YoungDiagram', decorator: Optional[bool] = None, lie_type=LieType.SL_N):
+    def __init__(self, my_partition: 'YoungDiagram',
+                 decorator: Optional[bool] = None,
+                 lie_type=LieType.SL_N):
         """
         in all cases the orbit is labelled by some sort of partition and possibly a boolean
         make sure the kind of partition and decorator are correct for the corresponding lie_type
@@ -117,8 +123,10 @@ class NilpotentOrbit:
             evens = list(filter(lambda z: z % 2 == 0, my_part_temp))
             is_very_even = len(evens) == len(my_part_temp)
             if decorator is None and is_very_even:
-                msg = " ".join(["Partitions with only even parts correspond to two different orbits",
-                                "so you must provide a boolean for the decorator to indicate which"])
+                msg = " ".join(["Partitions with only even parts",
+                                "correspond to two different orbits",
+                                "so you must provide a boolean",
+                                "for the decorator to indicate which"])
                 raise ValueError(msg)
             if is_very_even:
                 self.decorator = decorator
@@ -190,7 +198,23 @@ class NilpotentOrbit:
         """
         describe this nilpotent orbit
         """
-        return f"The nilpotent orbit corresponding to partition {self.my_diagram} in type {self.my_type.letter()} {self.lie_rank}"
+        return " ".join(["The nilpotent orbit corresponding",
+                         f"to partition {self.my_diagram}",
+                         f"in type {self.my_type.letter()} {self.lie_rank}"])
+
+    def __eq__(self,other) -> bool:
+        """
+        are they the same orbit
+        """
+        if not isinstance(other,NilpotentOrbit):
+            return False
+        if self.my_type != other.my_type:
+            return False
+        if self.lie_rank != other.lie_rank:
+            return False
+        if self.decorator != other.decorator:
+            return False
+        return self.my_diagram == other.my_diagram
 
     @staticmethod
     def _rank_2_n(my_type: LieType, lie_rank: Nat) -> Nat:
@@ -289,16 +313,20 @@ class NilpotentOrbit:
             min_part), decorator=None, lie_type=my_type)
         zero_orbit = NilpotentOrbit(YoungDiagram(
             [1 for _ in range(n_val)]), decorator=None, lie_type=my_type)
-        return {"Principal": principal_orbit, "Subregular": subregular_orbit, "Minimal": minimal_orbit, "Zero": zero_orbit}
+        return {"Principal": principal_orbit,
+                "Subregular": subregular_orbit,
+                "Minimal": minimal_orbit,
+                "Zero": zero_orbit}
 
     def is_in_closure(self, other) -> bool:
         """is other in closure of self"""
-        raise NotImplementedError
+        self_closure = self.closure()
+        return other in self_closure
 
     def closure(self) -> List["NilpotentOrbit"]:
         """which orbits are in the closure of self"""
         raise NotImplementedError
 
     def minimal_degeneration(self) -> List["NilpotentOrbit"]:
-        """todo"""
+        """explain minimal degeneration"""
         raise NotImplementedError
