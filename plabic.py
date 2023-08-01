@@ -516,7 +516,7 @@ class PlabicGraph:
         if num_edges_connecting != 1:
             return False, "There needs to be exactly one edge to split specified by these vertices"
         if desired_name in self.my_graph.nodes():
-                return False, "The new vertex name should be distinct from those present"
+            return False, "The new vertex name should be distinct from those present"
         key_this_that_all: List[int] = list(
             self.my_graph[this_vertex][that_vertex].keys())
         key_this_that = key_this_that_all[0]
@@ -567,7 +567,7 @@ class PlabicGraph:
                 "There needs to be exactly one edge to collapse specified by these vertices"
         if combined_name in self.my_graph.nodes() and \
             combined_name not in [this_vertex,that_vertex]:
-                return False, "The new vertex name should be distinct from those present"
+            return False, "The new vertex name should be distinct from those present"
         all_adjacencies: List[str] = list(self.my_graph[this_vertex])
         all_adjacencies.extend(self.my_graph[that_vertex])
         connects_to_this = [False] * len(all_adjacencies)

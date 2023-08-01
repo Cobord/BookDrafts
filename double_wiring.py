@@ -3,8 +3,7 @@ double wiring diagram
 also include single wiring diagram
 """
 
-from typing import Tuple,Set,List,Union,cast,Dict
-from functools import reduce
+from typing import Tuple,List,Dict
 
 from plabic import PlabicGraph, BiColor
 
@@ -49,7 +48,8 @@ class WiringDiagram:
             my_init_data[f"ext_left{idx+1}"] = (BiColor.RED,[f"wire{idx+1},0"])
             extra_node_props[f"ext_left{idx+1}"] = {"position" : (0,idx+1)}
         for idx in range(self.my_n):
-            my_init_data[f"ext_right{idx+1}"] = (BiColor.RED,[f"wire{idx+1},{very_last_numbers[idx]-1}"])
+            my_init_data[f"ext_right{idx+1}"] =\
+                (BiColor.RED,[f"wire{idx+1},{very_last_numbers[idx]-1}"])
             extra_node_props[f"ext_right{idx+1}"] = {"position" : (len(self.my_word)+1,idx+1)}
         left_ext = [f"ext_left{idx+1}" for idx in range(self.my_n)]
         right_ext = [f"ext_right{idx+1}" for idx in range(self.my_n)]
@@ -85,7 +85,8 @@ class WiringDiagram:
                 top_name_after = f"ext_right{letter+1}"
             else:
                 top_name_after = f"wire{letter+1},{top_number+1}"
-            my_init_data[bottom_name] = (bottom_color,[bottom_name_before,top_name,bottom_name_after])
+            my_init_data[bottom_name] = \
+                (bottom_color,[bottom_name_before,top_name,bottom_name_after])
             extra_node_props[bottom_name] = {"position" : (my_idx+1,letter)}
             my_init_data[top_name] = (top_color,[top_name_before,top_name_after,bottom_name])
             extra_node_props[top_name] = {"position" : (my_idx+1,letter+1)}
