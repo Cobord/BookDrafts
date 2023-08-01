@@ -102,6 +102,7 @@ class NilpotentOrbit:
     where g is one of A,B,C,D _n
     """
 
+    # pylint:disable = too-many-branches
     def __init__(self, my_partition: 'YoungDiagram',
                  decorator: Optional[bool] = None,
                  lie_type=LieType.SL_N):
@@ -202,11 +203,11 @@ class NilpotentOrbit:
                          f"to partition {self.my_diagram}",
                          f"in type {self.my_type.letter()} {self.lie_rank}"])
 
-    def __eq__(self,other) -> bool:
+    def __eq__(self, other) -> bool:
         """
         are they the same orbit
         """
-        if not isinstance(other,NilpotentOrbit):
+        if not isinstance(other, NilpotentOrbit):
             return False
         if self.my_type != other.my_type:
             return False

@@ -2,39 +2,106 @@
 diagrams used in the sense of cluster algebra
 """
 
-from typing import Iterator, List, Set, Tuple, TypeVar, Union
+from enum import Enum, auto
+from typing import Iterator, List, Set, Tuple, TypeVar, Union, Callable, Optional
 from typing import runtime_checkable, Protocol, Any, cast
 import itertools
 from functools import reduce
 import networkx as nx
 
-NT = TypeVar("NT")
+T = TypeVar("T")
+
+class Arithmetic(Protocol):
+    """
+    can be multiplied and added
+    """
+    def __mul__(self : T,other : T) -> T: ...
+    def __add__(self : T,other : T) -> T: ...
+
+NT = TypeVar("NT",bound=Arithmetic)
+
 WeightType = Union[float, NT]
 EdgeData = Tuple[int, int, WeightType]
 Nat = int
 
+class ChipType(Enum):
+    """
+    which direction the line on a chip goes
+    """
+    UP = auto()
+    DOWN = auto()
+    FLAT = auto()
+
+
+ChipWord = List[Tuple[ChipType, Nat]]
+
 # pylint:disable=line-too-long,invalid-name,too-many-locals,no-member,too-many-branches,too-few-public-methods
 
 
-class PlanarNetwork(nx.DiGraph):
+class PlanarNetwork:
     """
     built on top of a directed graph
     """
 
-    def __init__(self, n: Nat, edge_list: List[List[EdgeData]], *, multiplicative_identity: WeightType = 1.0, additive_identity: WeightType = 0.0):
+    @staticmethod
+    def from_chip_word(chip_word: ChipWord, weights: List[WeightType]) -> List[List[EdgeData]]:
+        """
+        edge data as in initializer
+        the initializer doesn't take this because we also want to
+        present the diagram as it would be drawn
+        with multiple elementary pieces occuring in the same stage
+        provided they concern different indices
+        """
+        if len(weights) != len(chip_word):
+            raise ValueError("The number of weights and chips must match")
+        ret_val = []
+        for ((ct, idx), wt) in zip(chip_word, weights):
+            if ct == ChipType.UP:
+                cur_edge = (idx, idx+1, wt)
+            elif ct == ChipType.DOWN:
+                cur_edge = (idx-1, idx, wt)
+            else:
+                cur_edge = (idx, idx, wt)
+            ret_val.append([cur_edge])
+        return ret_val
+
+    def __init__(self, n: Nat, *, edge_list: Optional[List[List[EdgeData]]] = None,
+                 chip_word: Optional[ChipWord] = None, chip_weights: Optional[List[WeightType]] = None,
+                 multiplicative_identity: WeightType = 1.0,
+                 additive_identity: WeightType = 0.0,
+                 totally_connected: bool = True):
         """
         a planar diagram with n horizontal lines
         """
-        super().__init__()
+        self._underlying_graph = nx.DiGraph()
         self.multiplicative_identity = multiplicative_identity
         self.additive_identity = additive_identity
+        self.totally_connected = totally_connected
         for x in range(1, n+1):
-            self.add_node(f"{x}_0")
+            self._underlying_graph.add_node(f"{x}_0")
         sink_number = {x: 0 for x in range(1, n+1)}
+        if edge_list is None:
+            if chip_word is not None and chip_weights is not None:
+                edge_list = PlanarNetwork.from_chip_word(
+                    chip_word, chip_weights)
+            else:
+                raise ValueError(
+                    "Either edge_list must be given or both chip_word and chip_weights")
+        self.chip_type: Optional[ChipWord] = [
+        ] if chip_word is None else chip_word
         for stage in edge_list:
             already_incremented = []
             for edge in stage:
                 from_node, to_node, cur_weight = edge
+                if chip_word is None and self.chip_type is not None:
+                    if from_node-to_node == 1:
+                        self.chip_type.append((ChipType.DOWN, to_node))
+                    elif to_node - from_node == 1:
+                        self.chip_type.append((ChipType.UP, to_node))
+                    elif to_node == from_node:
+                        self.chip_type.append((ChipType.FLAT, to_node))
+                    else:
+                        self.chip_type = None
                 if from_node in already_incremented:
                     from_number = sink_number[from_node]-1
                 else:
@@ -44,21 +111,21 @@ class PlanarNetwork(nx.DiGraph):
                 else:
                     to_number = sink_number[to_node]+1
                     sink_number[to_node] += 1
-                    self.add_edge(f"{to_node}_{to_number-1}",
-                                  f"{to_node}_{to_number}", weight=multiplicative_identity)
+                    self._underlying_graph.add_edge(f"{to_node}_{to_number-1}",
+                                                    f"{to_node}_{to_number}", weight=multiplicative_identity)
                     already_incremented.append(to_node)
-                self.add_node(f"{to_node}_{to_number}")
-                self.add_edge(f"{from_node}_{from_number}",
-                              f"{to_node}_{to_number}", weight=cur_weight)
+                self._underlying_graph.add_node(f"{to_node}_{to_number}")
+                self._underlying_graph.add_edge(f"{from_node}_{from_number}",
+                                                f"{to_node}_{to_number}", weight=cur_weight)
         self.sink_number = sink_number
 
-    def path_weight(self, path_nodes : List[Any]) -> WeightType:
+    def path_weight(self, path_nodes: List[Any]) -> WeightType:
         """
         multiply the weights for the path that connects all the path_nodes
         """
-        path_edges = [self[path_nodes[i]][path_nodes[i+1]]
-                      for i in range(len(path_nodes)-1)]
-        return reduce(lambda x, y: x*y, [x['weight'] for x in path_edges], self.multiplicative_identity)
+        path_edge_weights : Iterator[WeightType] = (self._underlying_graph[path_nodes[i]][path_nodes[i+1]]['weight']
+                      for i in range(len(path_nodes)-1))
+        return reduce(lambda acc, y: acc*y, (z for z in path_edge_weights), self.multiplicative_identity)
 
     def weight_matrix(self, my_i: Nat, my_j: Nat) -> WeightType:
         """
@@ -69,7 +136,7 @@ class PlanarNetwork(nx.DiGraph):
         source_node = f"{my_i}_0"
         sink_node = f"{my_j}_{self.sink_number[my_j]}"
         weight_ij = self.additive_identity
-        for path_nodes in nx.all_simple_paths(self, source_node, sink_node):
+        for path_nodes in nx.all_simple_paths(self._underlying_graph, source_node, sink_node):
             cur_contrib = self.path_weight(path_nodes)
             weight_ij += cur_contrib
         return weight_ij
@@ -86,19 +153,19 @@ class PlanarNetwork(nx.DiGraph):
         # so that (i,j) in collection means that particular i in i_set connects to j in j_set
         if len(i_set) == 0 or len(j_set) == 0:
             raise ValueError("The sets of sources and sinks must be nonempty")
-        relevant_pairings = [pairings_nc(i_set,j_set)]
+        relevant_pairings = [pairings_nc(i_set, j_set)]
         # relevant_pairings = pairings(i_set,j_set)
         for collection in relevant_pairings:
             path_collection_iterator = None
             # build up path_collection_iterator by taking the product of iterators
             # where each factor iterator is the ones that connect i to j
             ij_paths = (nx.all_simple_paths(
-                    self, f"{cur_i}_0", f"{cur_j}_{self.sink_number[cur_j]}")
-                    for cur_i, cur_j in collection)
+                self._underlying_graph, f"{cur_i}_0", f"{cur_j}_{self.sink_number[cur_j]}")
+                for cur_i, cur_j in collection)
             path_collection_iterator = itertools.product(*ij_paths)
             # now path_collection is a tuple of k paths that fully connect i_set to j_set
             for path_collection in path_collection_iterator:
-                seen_vertices : Set[Nat] = set({})
+                seen_vertices: Set[Nat] = set({})
                 is_vertex_disjoint = True
                 my_paths = []
                 for path in path_collection:
@@ -119,14 +186,48 @@ class PlanarNetwork(nx.DiGraph):
         the minor where specify to include the rows and columns specified by i_set and j_set
         """
         minor_value = self.additive_identity
+        had_contribution = False
         for contrib in self.vertex_disjoint_collection(i_set, j_set):
+            had_contribution = True
             minor_value += contrib
+        if not had_contribution:
+            self.totally_connected = False
         return minor_value
 
+    def totally_nonnegative(self, nonnegative_wt: Callable[[NT], bool]) -> bool:
+        """
+        is the associated weight matrix manifestly totally nonnegative
+        by the constituent weights being all nonnegative
+        """
+        all_weights : Iterator[WeightType] = (self._underlying_graph[src][tgt]['weight']
+                       for src, tgt in self._underlying_graph.edges())
+        def real_nonnegative_wt(arg : Union[float,NT]) -> bool:
+            """
+            essentially same as nonnegative_wt
+            """
+            if isinstance(arg,(float,int)):
+                return arg>=0
+            return nonnegative_wt(arg)
+        return all((real_nonnegative_wt(wt) for wt in all_weights))
 
-T = TypeVar("T")
+    def positive(self, positive_wt: Callable[[NT], bool]) -> bool:
+        """
+        is the associated weight matrix manifestly totally positive
+        by the constituent weights being all positive
+        """
+        assert self.totally_connected
+        all_weights : Iterator[WeightType] = (self._underlying_graph[src][tgt]['weight']
+                       for src, tgt in self._underlying_graph.edges())
+        def real_positive_wt(arg : Union[float,NT]) -> bool:
+            """
+            essentially same as positive_wt
+            """
+            if isinstance(arg,(float,int)):
+                return arg>=0
+            return positive_wt(arg)
+        return all((real_positive_wt(wt) for wt in all_weights))
+
 U = TypeVar("U")
-
 
 def pairings(i_set: Set[T], j_set: Set[U]) -> Iterator[Set[Tuple[T, U]]]:
     """
@@ -159,6 +260,7 @@ class Ordered(Protocol):
 V = TypeVar('V', bound=Ordered)
 W = TypeVar('W', bound=Ordered)
 
+
 def pairings_nc(i_set: Set[V], j_set: Set[W]) -> Set[Tuple[V, W]]:
     """
     the unique pairing of i_set with j_set
@@ -174,7 +276,12 @@ def pairings_nc(i_set: Set[V], j_set: Set[W]) -> Set[Tuple[V, W]]:
     return set(zip(i_list, j_list))
 
 # pylint:disable = too-many-arguments
-def determinant(matrix, mul, simplifier, additive_identity,negative_one,simplify_freq=3,original_width=None):
+def determinant(matrix : List[List[NT]], mul : NT,
+                simplifier : Callable[[NT],NT],
+                additive_identity : NT,
+                negative_one : NT,
+                simplify_freq : int=3,
+                original_width : Optional[int] =None) -> NT:
     """
     determinant using only + and *
     so that it can work on complex object types
@@ -200,14 +307,17 @@ def determinant(matrix, mul, simplifier, additive_identity,negative_one,simplify
                     buff.append(matrix[jdx][kdx])
             m.append(buff)
         sign *= negative_one
-        answer = answer + mul * determinant(m, sign * matrix[0][skip_col],simplifier,additive_identity,negative_one,simplify_freq,original_width)
+        answer = answer + mul * \
+            determinant(m, sign * matrix[0][skip_col], simplifier,
+                        additive_identity, negative_one, simplify_freq, original_width)
     if width % simplify_freq == original_width % simplify_freq:
         answer = simplifier(answer)
     return answer
 
+
 if __name__ == "__main__":
     # example is taken from https://arxiv.org/pdf/math/9912128.pdf figure 1
-    from sympy import symbols, Symbol, Expr
+    from sympy import symbols, Symbol, Expr, Add, Mul, Pow, Integer, Rational, UnevaluatedExpr
 
     def annotated_symbols(*args, **kwargs) -> Tuple[Symbol, ...]:
         """
@@ -218,7 +328,7 @@ if __name__ == "__main__":
     A, B, C, D, E, F, G, H, I = annotated_symbols(
         'a,b,c,d,e,f,g,h,i', commutative=True)
     ZERO, ONE = annotated_symbols('zero,one', commutative=True)
-    p = PlanarNetwork(3, [[(3, 2, A), (3, 3, ONE)], [(3, 2, C), (2, 1, B)], [
+    p = PlanarNetwork(3, edge_list=[[(3, 2, A), (3, 3, ONE)], [(3, 2, C), (2, 1, B)], [
                       (2, 2, E), (1, 1, D)], [(3, 3, F), (2, 3, G), (1, 2, H)], [(2, 3, I)]],
                       multiplicative_identity=ONE,
                       additive_identity=ZERO)
@@ -226,7 +336,7 @@ if __name__ == "__main__":
         [D, D*H, D*H*I], [B*D, B*D*H+E, B*D*H*I+E*(G+I)], [A*B*D, A*B*D*H+(A+C)*E, A*B*D*H*I+(A+C)*E*(G+I)+F]]
     for i in range(1, 4):
         for j in range(1, 4):
-            w_ij = cast(Expr,p.weight_matrix(i, j))
+            w_ij = cast(Expr, p.weight_matrix(i, j))
             w_ij = w_ij.subs({ZERO: 0.0, ONE: 1.0})
             print(f"a_({i},{j}) = {w_ij}")
             assert w_ij.equals(expected_weight_matrix[i-1][j-1])
@@ -234,24 +344,51 @@ if __name__ == "__main__":
     for weight in p.vertex_disjoint_collection({2, 3}, {2, 3}):
         print(f"\t{weight}")
     print("Doing Lindstrom")
-    delta_23_23 = cast(Expr,p.lindstrom_minor({2, 3}, {2, 3}))
+    delta_23_23 = cast(Expr, p.lindstrom_minor({2, 3}, {2, 3}))
     delta_23_23 = delta_23_23.subs({ZERO: 0.0, ONE: 1.0})
     print(f"Delta_23,23 = {delta_23_23}")
     expected = (B*C*D*E*G*H + B*D*F*H + E*F)*1.0
     assert delta_23_23 == expected
-    slice_23 = (2,3)
-    my_minor = [[expected_weight_matrix[cur_i-1][cur_j-1] for cur_i in slice_23] for cur_j in slice_23]
-    expected_2 = determinant(my_minor,ONE,
-                            lambda z : z.subs({ZERO: 0.0, ONE: 1.0}).simplify(),
-                            ZERO,-ONE)
+    slice_23 = (2, 3)
+    my_minor = [[expected_weight_matrix[cur_i-1][cur_j-1]
+                 for cur_i in slice_23] for cur_j in slice_23]
+    expected_2 = determinant(my_minor, ONE,
+                             lambda z: z.subs(
+                                 {ZERO: 0.0, ONE: 1.0}).simplify(),
+                             ZERO, -ONE)
     assert expected_2 == expected
 
-    delta_123_123 = cast(Expr,p.lindstrom_minor({2, 3, 1}, {1, 2, 3}))
+    delta_123_123 = cast(Expr, p.lindstrom_minor({2, 3, 1}, {1, 2, 3}))
     delta_123_123 = delta_123_123.subs({ZERO: 0.0, ONE: 1.0})
     print(f"Delta_123,123 = {delta_123_123}")
     expected_determinant = determinant(expected_weight_matrix,
                                        ONE,
-                                       lambda z : z.subs({ZERO: 0.0, ONE: 1.0}).simplify(),
+                                       lambda z: z.subs(
+                                           {ZERO: 0.0, ONE: 1.0}).simplify(),
                                        ZERO,
                                        -ONE)
     assert delta_123_123 == expected_determinant
+    def nn_with_my_symbols(edge_weight : Expr) -> bool:
+        """
+        a check that edge weight is nonnegative
+        provided that the given symbols are nonnnegative
+        checks with subtraction free
+        """
+        if isinstance(edge_weight,(Integer,Rational)):
+            return edge_weight>0
+        if isinstance(edge_weight,Symbol):
+            return edge_weight in {ONE, A, B, C, D, E, F, G, H, I}
+        op = edge_weight.func
+        args = edge_weight.args
+        if op == UnevaluatedExpr:
+            return nn_with_my_symbols(cast(Expr,args[0]))
+        if op in [Add,Mul]:
+            return all(nn_with_my_symbols(cast(Expr,arg)) for arg in args)
+        if op == Pow:
+            return nn_with_my_symbols(cast(Expr,args[0])) and isinstance(args[1],(Integer,Rational))
+        return False
+
+    tnn = p.totally_nonnegative(nn_with_my_symbols)
+    print(
+        f"With a through i nonnegative, the weight matrix is totally nonnegative : {tnn}")
+    print(f"The chip word is {p.chip_type}")
