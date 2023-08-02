@@ -1014,6 +1014,7 @@ class PlabicGraph:
              oriented_arrows: str = "black",
              unoriented_arrows_perfect: str = "yellow",
              unoriented_arrows_imperfect: str = "black",
+             overridden_arrow_orientation : Optional[Callable[[str,str,int],bool]] = None
              ) -> None:
         """
         draw the multigraph without regard to it's planar embedding
@@ -1037,39 +1038,45 @@ class PlabicGraph:
                 z: self.my_graph.nodes[z]["position"] for z in all_node_names}
         except KeyError:
             all_positions = None
-        draw_arrowheads = False
-        try:
-            special_edge_numbers = {
-                z: self.my_graph.nodes[z]["my_perfect_edge"] for z in all_node_names}
-            edge_is_special: List[Tuple[str, str, bool]] = \
-                [(u, v, k == special_edge_numbers[u])
-                 for u, v, k in self.my_graph.edges(keys=True)]
-            if draw_oriented_if_perfect:
-                draw_arrowheads = True
 
-                def keep_this_arrow(src_name: str, tgt_name: str, is_special: bool) -> bool:
-                    """
-                    whether this arrow is kept or not
-                    """
-                    src_color = self.get_color(src_name)
-                    if src_color is None:
-                        tgt_color = self.get_color(tgt_name)
-                        if tgt_color is None:
-                            # boundary to boundary edge
-                            # orientation not determined by color
-                            # of endpoints
-                            return (src_name < tgt_name) ^ is_special
-                        return (tgt_color == BiColor.GREEN) ^ (not is_special)
-                    return (src_color == BiColor.RED) ^ (not is_special)
-                something_transparent = "#0f0f0f00"
-                edge_colors = [oriented_arrows if keep_this_arrow(u, v, is_special)
-                               else something_transparent for u, v, is_special in edge_is_special]
-            else:
-                edge_colors = [unoriented_arrows_perfect if is_special
-                               else unoriented_arrows_imperfect
-                               for u, v, is_special in edge_is_special]
-        except KeyError:
-            edge_colors = None
+        something_transparent = "#0f0f0f00"
+        if overridden_arrow_orientation is None:
+            draw_arrowheads = False
+            try:
+                special_edge_numbers = {
+                    z: self.my_graph.nodes[z]["my_perfect_edge"] for z in all_node_names}
+                edge_is_special: List[Tuple[str, str, bool]] = \
+                    [(u, v, k == special_edge_numbers[u])
+                    for u, v, k in self.my_graph.edges(keys=True)]
+                if draw_oriented_if_perfect:
+                    draw_arrowheads = True
+
+                    def keep_this_arrow(src_name: str, tgt_name: str, is_special: bool) -> bool:
+                        """
+                        whether this arrow is kept or not
+                        """
+                        src_color = self.get_color(src_name)
+                        if src_color is None:
+                            tgt_color = self.get_color(tgt_name)
+                            if tgt_color is None:
+                                # boundary to boundary edge
+                                # orientation not determined by color
+                                # of endpoints
+                                return (src_name < tgt_name) ^ is_special
+                            return (tgt_color == BiColor.GREEN) ^ (not is_special)
+                        return (src_color == BiColor.RED) ^ (not is_special)
+                    edge_colors = [oriented_arrows if keep_this_arrow(u, v, is_special)
+                                else something_transparent for u, v, is_special in edge_is_special]
+                else:
+                    edge_colors = [unoriented_arrows_perfect if is_special
+                                else unoriented_arrows_imperfect
+                                for u, v, is_special in edge_is_special]
+            except KeyError:
+                edge_colors = None
+        else:
+            edge_colors = [oriented_arrows if overridden_arrow_orientation(u, v, k)
+                        else something_transparent
+                        for u, v, k in self.my_graph.edges(keys=True)]
         nx.draw(self.my_graph, pos=all_positions,
                 node_color=all_colors, edge_color=edge_colors,
                 arrows=draw_arrowheads, with_labels=True)
