@@ -3,7 +3,8 @@ double wiring diagram
 also include single wiring diagram
 """
 
-from typing import Tuple,List,Dict,Iterator,Set,Any
+from functools import reduce
+from typing import Tuple,List,Dict,Iterator,Set,Any,cast
 
 from plabic import PlabicGraph, BiColor
 
@@ -14,8 +15,9 @@ class WiringDiagram:
     a single or double wiring diagram
     """
     def __init__(self,my_n : int, my_word : List[int]):
-        if my_n<=0:
-            raise ValueError("The number of strands must be a positive natural number")
+        if my_n<=1:
+            msg = "The number of strands must be natural number greater than 1"
+            raise ValueError(msg)
         def valid_letter(letter : int) -> bool:
             """
             is (letter,letter+1) a transposition for S_{my_n}
@@ -26,6 +28,10 @@ class WiringDiagram:
 
         if not all(valid_letter(z) for z in my_word):
             raise ValueError(f"The letters in the double word must be 1 to {my_n} or negative that")
+        my_sets = (set([abs(letter),abs(letter)+1]) for letter in my_word)
+        all_wires_touched = reduce(lambda acc,new : acc.union(new),my_sets,cast(Set[int],set()))
+        if len(all_wires_touched) < my_n:
+            raise ValueError("There were some indices that never were involved in a swap")
         self.my_word = my_word
         self.my_n = my_n
         self.num_positive_letters = sum(1 if z>0 else 0 for z in my_word)
@@ -159,4 +165,27 @@ if __name__ == "__main__":
         print(chamber_minor)
         assert chamber_minor == expected_chamber_minor
     p = dw.to_plabic()
+    p.draw(draw_oriented_if_perfect = False)
+
+    DID_ERROR = False
+    try:
+        double_word = []
+        dw = WiringDiagram(2,double_word)
+    except ValueError:
+        DID_ERROR = True
+    assert DID_ERROR
+
+    double_word = [1]
+    dw = WiringDiagram(2,double_word)
+    p = dw.to_plabic()
+    assert p.is_bipartite()
+    assert p.my_perfect_matching == set([("wire1,0","wire2,0",1),("wire2,0","wire1,0",2)])
+    p.draw(draw_oriented_if_perfect = False)
+    double_word = [1,-1]
+    dw = WiringDiagram(2,double_word)
+    p = dw.to_plabic()
+    assert p.my_perfect_matching == set([("wire1,0","wire2,0",1),
+                                         ("wire2,0","wire1,0",2),
+                                         ("wire1,1","wire2,1",1),
+                                         ("wire2,1","wire1,1",2)])
     p.draw()

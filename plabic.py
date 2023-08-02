@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 
 # pylint:disable=too-many-lines
 
+
 class BiColor(Enum):
     """
     the two colors for internal vertices
@@ -23,6 +24,8 @@ class BiColor(Enum):
 ExtraData = Dict[str, Any]
 
 # pylint:disable=too-many-public-methods
+
+
 class PlabicGraph:
     """
     built on top of a directed multigraph
@@ -34,7 +37,7 @@ class PlabicGraph:
     my_internal_bdry: List[List[str]]
     all_bdry_nodes: List[str]
     multi_edge_permutation: Dict[Tuple[str, str], Dict[int, int]]
-    my_perfect_matching : Optional[Set[Tuple[str,str,int]]]
+    my_perfect_matching: Optional[Set[Tuple[str, str, int]]]
 
     # pylint:disable = too-many-arguments, too-many-locals, too-many-branches,too-many-statements
     def __init__(self, my_init_data: Dict[str, Tuple[BiColor, List[str]]],
@@ -116,6 +119,7 @@ class PlabicGraph:
                 self.__multi_edge_permutation_add(src, tgt, src_to_tgt_dict,
                                                   tgt_to_src_dict, num_src_tgt)
         self.boundary_connectivity()
+        self.my_perfect_matching: Optional[Set[Tuple[str, str, int]]] = set()
         self.__my_perfect_matching_fix(any_self_loops)
 
     def __add_props(self, vertex: str, props: ExtraData):
@@ -127,11 +131,11 @@ class PlabicGraph:
             if prop_name not in ["is_interior", "color"]:
                 self.my_graph.nodes[vertex][prop_name] = prop_val
 
-    def remove_prop(self,prop_name):
+    def remove_prop(self, prop_name):
         """
         remove a property from all nodes
         """
-        if prop_name in ["is_interior","color"]:
+        if prop_name in ["is_interior", "color"]:
             raise ValueError("Can only delete the optional properties")
         for cur_node in self.my_graph.nodes:
             try:
@@ -155,45 +159,48 @@ class PlabicGraph:
                 "Every internal vertex should be connected to some boundary vertex")
         self.my_graph.remove_node(infinity_node)
 
-    def __my_perfect_matching_fix(self,any_self_loops : bool):
+    def clear_perfect_matching(self):
+        """
+        clears everything to do with perfect orientation
+        """
+        self.remove_prop("my_perfect_edge")
+        self.my_perfect_matching = None
+
+    def __my_perfect_matching_fix(self, any_self_loops: bool):
         """
         makes sure the numbers giving my_perfect_edge
         on each vertex induce a perfect matching
         possibly after ignoring some of the boundary vertices
         """
         if any_self_loops:
-            self.remove_prop("my_perfect_edge")
-            self.my_perfect_matching = None
+            self.clear_perfect_matching()
             return
         if not self.is_bipartite():
-            self.remove_prop("my_perfect_edge")
-            self.my_perfect_matching = None
+            self.clear_perfect_matching()
             return
         all_node_names = list(self.my_graph.nodes())
         try:
             special_edge_numbers = {
                 z: self.my_graph.nodes[z]["my_perfect_edge"] for z in all_node_names}
         except KeyError:
-            self.remove_prop("my_perfect_edge")
-            self.my_perfect_matching = None
+            self.clear_perfect_matching()
             return
-        self.my_perfect_matching : Set[Tuple[str,str,int]] = set()
-        already_partnered : Dict[str,str] = {}
-        for src_name,tgt_name,edge_key in self.my_graph.edges(keys=True):
-            if edge_key==special_edge_numbers[src_name]:
+        self.my_perfect_matching: Optional[Set[Tuple[str, str, int]]] = set()
+        already_partnered: Dict[str, str] = {}
+        for src_name, tgt_name, edge_key in self.my_graph.edges(keys=True):
+            if edge_key == special_edge_numbers[src_name]:
                 if src_name in already_partnered:
-                    raise ValueError(f"Should not have seen {src_name} as a source yet")
+                    raise ValueError(
+                        f"Should not have seen {src_name} as a source yet")
                 already_partnered[src_name] = tgt_name
-                if already_partnered.get(tgt_name,src_name) != src_name:
-                    self.remove_prop("my_perfect_edge")
-                    self.my_perfect_matching = None
+                if already_partnered.get(tgt_name, src_name) != src_name:
+                    self.clear_perfect_matching()
                     return
-                self.my_perfect_matching.add((src_name,tgt_name,edge_key))
+                self.my_perfect_matching.add((src_name, tgt_name, edge_key))
         for src_name in self.my_graph:
             if src_name not in already_partnered and \
-                self.my_graph.nodes[src_name]["is_interior"]:
-                self.remove_prop("my_perfect_edge")
-                self.my_perfect_matching = None
+                    self.my_graph.nodes[src_name]["is_interior"]:
+                self.clear_perfect_matching()
                 break
 
     def __multi_edge_permutation_add(self, src: str, tgt: str,
@@ -276,7 +283,7 @@ class PlabicGraph:
         """
         are all edges connecting internal vertices opposite colors
         """
-        for src,tgt in itertools.combinations(self.my_graph, 2):
+        for src, tgt in itertools.combinations(self.my_graph, 2):
             if not self.my_graph.nodes[src]["is_interior"] or \
                     not self.my_graph.nodes[tgt]["is_interior"]:
                 continue
@@ -373,6 +380,7 @@ class PlabicGraph:
             return False, "The 4 must be trivalent"
         is_quad = True
         alternating_colors = True
+
         for cur_node, next_node in zip(four_nodes, four_nodes[1:]):
             is_quad = is_quad and self.nodes_connected(cur_node, next_node)
             alternating_colors = alternating_colors and self.opposite_colors(
@@ -385,12 +393,19 @@ class PlabicGraph:
             return False, "The 4 must form a quadrilateral"
         if not alternating_colors:
             return False, "The 4 must alternate colors"
+
         for cur_node in four_nodes:
             cur_color = self.get_color(cur_node)
             if cur_color is BiColor.RED:
                 self.my_graph.nodes()[cur_node]["color"] = BiColor.GREEN
             else:
                 self.my_graph.nodes()[cur_node]["color"] = BiColor.RED
+
+        # clears everything to do with perfect orientation
+        # could fix the perfect orientation instead
+        # along this move
+        self.clear_perfect_matching()
+
         return True, "Success"
 
     # pylint:disable = too-many-return-statements, too-many-statements
@@ -513,6 +528,12 @@ class PlabicGraph:
                 that_vertex, vertex_b,
                 {0: halfedge_number_from_b,
                  1: halfedge_number_from_d}, None, 2)
+
+        # clears everything to do with perfect orientation
+        # could fix the perfect orientation instead
+        # along this move
+        self.clear_perfect_matching()
+
         return True, "Success"
 
     def remove_bivalent(self, my_bivalent_vertex: str) -> Tuple[bool, str]:
@@ -556,6 +577,12 @@ class PlabicGraph:
         if old_dict_21 is not None:
             old_dict_21[idx_from_side_2] = idx_from_side_1
             self.multi_edge_permutation[(side_2, side_1)] = old_dict_21
+
+        # clears everything to do with perfect orientation
+        # could fix the perfect orientation instead
+        # along this move
+        self.clear_perfect_matching()
+
         return True, "Success"
 
     def insert_bivalent(self, this_vertex: str, that_vertex: str,
@@ -596,6 +623,12 @@ class PlabicGraph:
         self.my_graph.add_edge(desired_name, this_vertex, 0)
         self.my_graph.add_edge(that_vertex, desired_name, key_that_this)
         self.my_graph.add_edge(desired_name, that_vertex, 1)
+
+        # clears everything to do with perfect orientation
+        # could fix the perfect orientation instead
+        # along this move
+        self.clear_perfect_matching()
+
         return True, "Success"
 
     def contract_edge(self, this_vertex: str,
@@ -625,7 +658,7 @@ class PlabicGraph:
             return False,\
                 "There needs to be exactly one edge to collapse specified by these vertices"
         if combined_name in self.my_graph.nodes() and \
-            combined_name not in [this_vertex,that_vertex]:
+                combined_name not in [this_vertex, that_vertex]:
             return False, "The new vertex name should be distinct from those present"
         all_adjacencies: List[str] = list(self.my_graph[this_vertex])
         all_adjacencies.extend(self.my_graph[that_vertex])
@@ -689,6 +722,12 @@ class PlabicGraph:
                     self.multi_edge_permutation[(combined_name, tgt)] = {}
                     self.multi_edge_permutation[(combined_name, tgt)][key_from_combined] =\
                         half_edge_from_tgt
+
+        # clears everything to do with perfect orientation
+        # could fix the perfect orientation instead
+        # along this move
+        self.clear_perfect_matching()
+
         return True, "Success"
 
     def split_vertex(self, this_vertex: str,
@@ -713,7 +752,7 @@ class PlabicGraph:
         if split_name_1 == split_name_2:
             return False, "The new vertex names should be distinct from each other"
         if split_name_1 in self.my_graph.nodes() or \
-            split_name_2 in self.my_graph.nodes():
+                split_name_2 in self.my_graph.nodes():
             if split_name_1 == this_vertex and split_name_2 not in self.my_graph.nodes():
                 pass
             elif split_name_2 == this_vertex and split_name_1 not in self.my_graph.nodes():
@@ -788,6 +827,12 @@ class PlabicGraph:
                     self.multi_edge_permutation[(split_name_2, tgt)] = {}
                 self.multi_edge_permutation[(
                     split_name_2, tgt)][on_2_key] = on_tgt_key
+
+        # clears everything to do with perfect orientation
+        # could fix the perfect orientation instead
+        # along this move
+        self.clear_perfect_matching()
+
         return True, "Success"
 
     def operad_compose(self, other: PlabicGraph, which_internal_disk: int) -> Tuple[bool, str]:
@@ -872,6 +917,12 @@ class PlabicGraph:
                                     "it was univalent to distinct targets in the two pieces",
                                     "then the composition would make it bivalent"])
                 raise ValueError(new_msg)
+
+        # clears everything to do with perfect orientation
+        # could fix the perfect orientation instead
+        # along this move
+        self.clear_perfect_matching()
+
         return True, "Success"
 
     def bdry_to_bdry(self, starting_bdry_node: str) -> Tuple[Optional[BiColor], str]:
@@ -955,14 +1006,14 @@ class PlabicGraph:
         raise ValueError(
             f"There should be an edge numbered {next_edge_number} on {at_this_node}")
 
-    def draw(self,*,
-             draw_oriented_if_perfect = True,
-             red_nodes : str = "red",
-             green_nodes : str = "green",
-             bdry_nodes : str = "black",
-             oriented_arrows : str = "black",
-             unoriented_arrows_perfect : str = "yellow",
-             unoriented_arrows_imperfect : str = "black",
+    def draw(self, *,
+             draw_oriented_if_perfect=True,
+             red_nodes: str = "red",
+             green_nodes: str = "green",
+             bdry_nodes: str = "black",
+             oriented_arrows: str = "black",
+             unoriented_arrows_perfect: str = "yellow",
+             unoriented_arrows_imperfect: str = "black",
              ) -> None:
         """
         draw the multigraph without regard to it's planar embedding
@@ -990,11 +1041,13 @@ class PlabicGraph:
         try:
             special_edge_numbers = {
                 z: self.my_graph.nodes[z]["my_perfect_edge"] for z in all_node_names}
-            edge_is_special : List[Tuple[str,str,bool]] = \
-                [(u,v,k==special_edge_numbers[u]) for u,v,k in self.my_graph.edges(keys=True)]
+            edge_is_special: List[Tuple[str, str, bool]] = \
+                [(u, v, k == special_edge_numbers[u])
+                 for u, v, k in self.my_graph.edges(keys=True)]
             if draw_oriented_if_perfect:
                 draw_arrowheads = True
-                def keep_this_arrow(src_name : str, tgt_name : str, is_special : bool) -> bool:
+
+                def keep_this_arrow(src_name: str, tgt_name: str, is_special: bool) -> bool:
                     """
                     whether this arrow is kept or not
                     """
@@ -1002,24 +1055,26 @@ class PlabicGraph:
                     if src_color is None:
                         tgt_color = self.get_color(tgt_name)
                         if tgt_color is None:
-                            return src_name<tgt_name
-                        return (tgt_color==BiColor.GREEN) ^ (not is_special)
-                    return (src_color==BiColor.RED) ^ (not is_special)
+                            # boundary to boundary edge
+                            # orientation not determined by color
+                            # of endpoints
+                            return (src_name < tgt_name) ^ is_special
+                        return (tgt_color == BiColor.GREEN) ^ (not is_special)
+                    return (src_color == BiColor.RED) ^ (not is_special)
                 something_transparent = "#0f0f0f00"
-                edge_colors = [oriented_arrows if keep_this_arrow(u,v,is_special)
-                               else something_transparent for u,v,is_special in edge_is_special]
+                edge_colors = [oriented_arrows if keep_this_arrow(u, v, is_special)
+                               else something_transparent for u, v, is_special in edge_is_special]
             else:
                 edge_colors = [unoriented_arrows_perfect if is_special
                                else unoriented_arrows_imperfect
-                               for u,v,is_special in edge_is_special]
+                               for u, v, is_special in edge_is_special]
         except KeyError:
             edge_colors = None
         nx.draw(self.my_graph, pos=all_positions,
                 node_color=all_colors, edge_color=edge_colors,
-                arrows=draw_arrowheads,with_labels=True)
+                arrows=draw_arrowheads, with_labels=True)
         plt.draw()
         plt.show()
-
 
 if __name__ == "__main__":
     # example from figure 7.1 of https://arxiv.org/pdf/2106.02160.pdf
