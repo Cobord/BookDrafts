@@ -2,8 +2,9 @@
 Triangulation of convex m-gon
 """
 
-from typing import Tuple,Set,List,Union,cast,Dict
+from typing import Tuple,Set,List,Union,cast,Dict,Any
 from functools import reduce
+from math import sin, cos, pi as PI, atan2
 
 from plabic import PlabicGraph, BiColor
 
@@ -152,11 +153,9 @@ class Triangulation:
         as the quiver associated to triangulation
         """
         my_init_data : Dict[str,Tuple[BiColor,List[str]]] = {}
-        extra_node_props = {}
+        extra_node_props : Dict[str,Dict[str,Any]] = {}
         for idx in range(self.num_points):
-            my_init_data[f"int{idx}"] = (BiColor.GREEN,[])
             my_init_data[f"ext{idx}"] = (BiColor.RED,[f"int{idx}"])
-            extra_node_props[f"int{idx}"] = {"position" : self.vertices[idx]}
             scaled_up_pt = list(self.vertices[idx])
             scaled_up_pt[0] -= self.center[0]
             scaled_up_pt[1] -= self.center[1]
@@ -164,16 +163,38 @@ class Triangulation:
             scaled_up_pt[1] *= 2
             scaled_up_pt[0] += self.center[0]
             scaled_up_pt[1] += self.center[1]
-            extra_node_props[f"ext{idx}"] = {"position" : (scaled_up_pt[0],scaled_up_pt[1])}
+            extra_node_props[f"ext{idx}"] = {"position" : (scaled_up_pt[0],scaled_up_pt[1]),
+                                             "my_perfect_edge" : -1}
+            extra_node_props[f"int{idx}"] = {"position" : self.vertices[idx],
+                                             "my_perfect_edge" : 0}
+        perfect_matching : Dict[str,str] = {}
         for (triangle_num,(pt_one,pt_two,pt_three)) in enumerate(self.my_triangles):
-            my_init_data[f"triangle{triangle_num}"] =\
-                (BiColor.RED,[f"int{pt_one}",f"int{pt_two}",f"int{pt_three}"])
             loc_one = self.vertices[pt_one]
             loc_two = self.vertices[pt_two]
             loc_three = self.vertices[pt_three]
             averaged_position = (loc_one[0]+loc_two[0]+loc_three[0])/3.0,\
                 (loc_one[1]+loc_two[1]+loc_three[1])/3.0
-            extra_node_props[f"triangle{triangle_num}"] = {"position" : averaged_position}
+            which_vertices = [f"int{pt_one}",f"int{pt_two}",f"int{pt_three}"]
+            which_vertices = clockwise_order(which_vertices,extra_node_props,averaged_position)
+            my_matching_pt = f"int{pt_two}"
+            where_my_matching_pt = which_vertices.index(my_matching_pt)
+            my_init_data[f"triangle{triangle_num}"] =\
+                (BiColor.RED,which_vertices)
+            extra_node_props[f"triangle{triangle_num}"] = {"position" : averaged_position,
+                                                           "my_perfect_edge" : where_my_matching_pt}
+            perfect_matching[my_matching_pt] = f"triangle{triangle_num}"
+        for idx in range(self.num_points):
+            which_vertices = \
+                [f"triangle{trinum}" for trinum,tri in enumerate(self.my_triangles)
+                 if idx in set(tri)]
+            which_vertices.append(f"ext{idx}")
+            which_vertices = clockwise_order(which_vertices,extra_node_props,self.vertices[idx])
+            my_init_data[f"int{idx}"] = (BiColor.GREEN,which_vertices)
+            my_match = perfect_matching.get(f"int{idx}",f"ext{idx}")
+            extra_node_props[f"int{idx}"]["my_perfect_edge"] = \
+                which_vertices.index(my_match)
+            if my_match == f"ext{idx}":
+                extra_node_props[f"ext{idx}"]["my_perfect_edge"] = 0
         external_init_orientation = [f"ext{idx}" for idx in range(self.num_points)]
         multi_edge_permutation : Dict[Tuple[str,str],Dict[int,int]] = {}
         internal_bdry_orientations = None
@@ -183,10 +204,23 @@ class Triangulation:
                  internal_bdry_orientations,
                  extra_node_props)
 
+def clockwise_order(node_names : List[str],
+                    prop_dict : Dict[str,Dict[str,Any]],
+                    center : Point) -> List[str]:
+    """
+    order the node_names clockwise with the usual cut
+    based on their positions in prop_dict
+    relative to the center
+    """
+    node_positions : List[Point] = [prop_dict[cur_pt]["position"] for cur_pt in node_names]
+    node_vectors = [(x-center[0],y-center[0]) for x,y in node_positions]
+    node_name_angle = list(zip(node_names,[atan2(y,x) for (x,y) in node_vectors]))
+    node_name_angle.sort(key=lambda z: -z[1])
+    return [node_name for (node_name,_) in node_name_angle]
+
 if __name__ == '__main__':
     N = 8
     my_diagonals = [(4,7),(2,8),(2,4),(2,7),(4,6)]
-    from math import sin, cos, pi as PI
     RADIUS = 2
     t = Triangulation([ (RADIUS*cos(2*PI*which/N),RADIUS*sin(2*PI*which/N))
                        for which in range(N)], [(x-1,y-1) for x,y in my_diagonals])
@@ -195,6 +229,7 @@ if __name__ == '__main__':
         assert diag[0]==quad[0]
         assert diag[1]==quad[2]
     p = t.to_plabic()
+    assert p.my_perfect_matching is not None
     p.draw()
     change, new_diag = t.quad_flip((1,3))
     assert change
@@ -209,4 +244,6 @@ if __name__ == '__main__':
         assert diag[1]==quad[2]
     print(f"Triangles are : {t.my_triangles}")
     p = t.to_plabic()
+    print(f"Perfect matching : {p.my_perfect_matching}")
+    assert p.my_perfect_matching is not None
     p.draw()
