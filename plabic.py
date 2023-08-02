@@ -1008,6 +1008,7 @@ class PlabicGraph:
 
     def draw(self, *,
              draw_oriented_if_perfect=True,
+             show_node_names : bool = True,
              red_nodes: str = "red",
              green_nodes: str = "green",
              bdry_nodes: str = "black",
@@ -1025,11 +1026,8 @@ class PlabicGraph:
             """
             convert from node name to the color to draw it as
             """
-            color_internal = color_dict.get(
-                cast(BiColor, self.get_color(name)), None)
-            if color_internal is not None:
-                return color_internal
-            return bdry_nodes
+            return color_dict.get(
+                cast(BiColor, self.get_color(name)), bdry_nodes)
 
         all_node_names = list(self.my_graph.nodes())
         all_colors = [name_to_color(z) for z in all_node_names]
@@ -1079,7 +1077,7 @@ class PlabicGraph:
                         for u, v, k in self.my_graph.edges(keys=True)]
         nx.draw(self.my_graph, pos=all_positions,
                 node_color=all_colors, edge_color=edge_colors,
-                arrows=draw_arrowheads, with_labels=True)
+                arrows=draw_arrowheads, with_labels=show_node_names)
         plt.draw()
         plt.show()
 
