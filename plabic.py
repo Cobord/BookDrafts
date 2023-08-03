@@ -112,7 +112,13 @@ class PlabicGraph:
             num_tgt_src = self.num_connecting_edges(tgt, src)
             if num_src_tgt != num_tgt_src:
                 raise ValueError(
-                    "Each edge needs to have a corresponding backwards edge")
+                    "\n".join([
+                        "Each edge needs to have a corresponding backwards edge",
+                        f"The one currently wrong was {src} {tgt}",
+                        f"Forward {num_src_tgt}, Backwards {num_tgt_src}",
+                        f"All out of {src} : {my_init_data[src][1]}",
+                        f"All out of {tgt} : {my_init_data[tgt][1]}",
+                        ]))
             if num_src_tgt > 1:
                 src_to_tgt_dict = multi_edge_permutation.get((src, tgt), None)
                 tgt_to_src_dict = multi_edge_permutation.get((tgt, src), None)
