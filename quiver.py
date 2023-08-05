@@ -1,10 +1,12 @@
 """
 quiver path algebra computations
+TODO : path algebra multiplication order check 
 """
 
 from functools import reduce
 from typing import Callable, Dict, List, Optional, Set, Tuple, Union, cast
 import numpy as np
+from sympy import symbols, Expr
 
 # pylint:disable = unnecessary-lambda, unnecessary-lambda-assignment,too-many-instance-attributes
 # pylint:disable = line-too-long, invalid-name, no-member, protected-access, no-else-return
@@ -520,6 +522,21 @@ class PathAlgebra:
         """
         return f"{self.element} on {self._quiver}"
 
+    def to_symbolic(self):
+        """
+        convert each edge name to a symbol
+        then make the sympy Expression for this element
+        of the path algebra
+        """
+        self.element.remove_zero_terms(lambda k: self.is_nonzero(k))
+        ret_val = 0
+        for k, v in self.element.element.items():
+            factors = k.split(";")
+            factors_symbolic = symbols(factors,commutative=False)
+            cur_contrib = reduce(lambda acc,z:acc*z,factors_symbolic)
+            cur_contrib *= v
+            ret_val += cur_contrib
+        return ret_val
 
 if __name__ == '__main__':
     jordan_quiver = Quiver()
@@ -541,6 +558,9 @@ if __name__ == '__main__':
 
     x = PathAlgebra(jordan_quiver, [(complex(1, 0), [a_idx])])
     print(x)
+    a_sym = symbols("a",commutative=False)
+    print(x.to_symbolic())
+    assert x.to_symbolic() == complex(1,0)*a_sym
     print(x+x)
     print(x*x)
     print()
@@ -554,6 +574,7 @@ if __name__ == '__main__':
     xb = PathAlgebra(kronecker_quiver, [(complex(1, 0), [b_idx])])
     print(my_sum := xa-xb*5)
     assert str(my_sum.element) == "(1+0j)*a+(-5-0j)*b"
+    assert my_sum.to_symbolic() == a_sym*complex(1,0)-complex(5,0)*symbols("b",commutative=False)
     print(prod := xa*xb)
     assert str(prod.element) == "0j"
     y = xa
@@ -576,6 +597,12 @@ if __name__ == '__main__':
     xb = PathAlgebra(triple_quiver, [(complex(1, 0), [b_idx])])
     xc = PathAlgebra(triple_quiver, [(complex(1, 0), [c_idx])])
     ginz_cubic = xa*xb*xc-xb*xa*xc
+    a_sym = symbols("a",commutative=False)
+    adag_sym = symbols("adag",commutative=False)
+    omega_sym = symbols("omega",commutative=False)
+    exp_ginz_cubic : Expr = (a_sym*adag_sym-adag_sym*a_sym)*omega_sym*complex(1,0)
+    exp_ginz_cubic = exp_ginz_cubic.expand()
+    assert ginz_cubic.to_symbolic() == exp_ginz_cubic
     ginz3_cyclic = ginz_cubic.is_cyclic()
     print(f"Ginzburg cubic [a,a^dagger]omega is cyclic? : {ginz3_cyclic}")
     assert ginz3_cyclic
