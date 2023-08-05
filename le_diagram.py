@@ -3,12 +3,12 @@ Le Diagram
 """
 
 from enum import Enum, auto
-from typing import List, Optional, Tuple, Set, Iterable, Union, TypeVar, Dict, cast
+from typing import List, Optional, Tuple, Set, Iterable, Union, TypeVar, Dict, cast, Iterator
 import itertools
 
 from plabic import BiColor, ExtraData, PlabicGraph
 
-#pylint:disable=too-many-locals,too-many-statements,too-many-branches
+#pylint:disable=too-many-locals,too-many-statements,too-many-branches,too-many-return-statements,too-many-instance-attributes
 
 Point = Tuple[float, float]
 
@@ -178,12 +178,16 @@ class LeDiagram:
                     locations_1s.add((row_idx,col_idx))
         for ((i_1,j_1),(i_2,j_2)) in itertools.combinations(locations_1s,2):
             if i_1<i_2 and j_1>j_2:
-                if not filling[i_2][j_1]:
+                check_here = safe_index(filling[i_2],j_1,True)
+                if not check_here:
                     raise ValueError(f"{(i_1,j_1)} and {(i_2,j_2)} were 1, but {(i_2,j_1)} was not")
-        ones_data : Dict[Tuple[int,int],Tuple[FourBool,FourInt,FourBool]] = {}
 
-        self.column_heights : List[Optional[int]] = [None]*self.width
         self.filling = filling
+
+        ones_data : Dict[Tuple[int,int],Tuple[FourBool,FourInt,FourBool]] = {}
+        self.column_heights : List[Optional[int]] = [None]*self.width
+        self.nearest_strictly_nw : Dict[Tuple[int,int],Tuple[int,int]] = {}
+        self.nearest_weakly_nw : Dict[Tuple[int,int],Tuple[int,int]] = {}
 
         for (cur_row_idx,cur_col_idx) in locations_1s:
 
@@ -239,6 +243,21 @@ class LeDiagram:
                  (above_off_d,left_off_d,below_off_d,right_off_d))
         self.ones_data = ones_data
 
+        cur_box = (0,self.width-1)
+        southeast_bdry: List[Tuple[int,int]] = []
+        empty_bool_list : List[bool] = []
+        for _ in range(self.height+1):
+            if cur_box[1]<0 or cur_box[0]>=self.height:
+                break
+            southeast_bdry.append(cur_box)
+            next_len = len(safe_index(self.filling,cur_box[0]+1,empty_bool_list))
+            while cur_box[1]+1 > next_len:
+                cur_box = (cur_box[0],cur_box[1]-1)
+                if cur_box[1]>=0:
+                    southeast_bdry.append(cur_box)
+            cur_box = (cur_box[0]+1,next_len-1)
+        self.southeast_bdry = southeast_bdry
+
     def column_height(self,which_col : int) -> Optional[int]:
         """
         how many boxes in this column, None which_col is <0 or >=self.width
@@ -256,6 +275,266 @@ class LeDiagram:
                 self.column_heights[which_col] = my_ht
                 return my_ht
         return None
+
+    def nw_path(self,cur_loc : Tuple[int,int],start_weak : bool) -> Iterator[Tuple[int,int]]:
+        """
+        path always going strictly northwest starting
+        either starts at the nearest 1 strictly/weakly northwest of cur_loc
+        """
+        my_loc = self.nw_path_next(cur_loc,not start_weak)
+        while True:
+            if my_loc is None:
+                break
+            yield my_loc
+            my_loc = self.nw_path_next(my_loc,True)
+
+    def nw_path_next(self,cur_loc : Tuple[int,int], strict : bool) -> Optional[Tuple[int,int]]:
+        """
+        the unique (if exists) box with a 1 in it that is (strictly) to the northwest
+        of cur_loc
+        """
+        manhattan_dist = True
+        if manhattan_dist:
+            dist_power = 1
+        else:
+            dist_power = 2
+        if strict:
+            cached_answer = self.nearest_strictly_nw.get(cur_loc,None)
+        else:
+            cached_answer = self.nearest_weakly_nw.get(cur_loc,None)
+        if cached_answer is not None:
+            return cached_answer if cached_answer != (-1,-1) else None
+        try:
+            my_entry = self.filling[cur_loc[0]][cur_loc[1]]
+        except IndexError:
+            my_entry = None
+        if my_entry is None:
+            raise ValueError(f"The current location {cur_loc} must be in the diagram")
+        if not strict and my_entry:
+            self.nearest_weakly_nw[cur_loc] = cur_loc
+            return cur_loc
+        if strict and (cur_loc[0]==0 or cur_loc[1]==0):
+            self.nearest_strictly_nw[cur_loc] = (-1,-1)
+            return None
+        # weakly northwest
+        if not strict:
+            if cur_loc[0]>0:
+                option_from_north = self.nw_path_next((cur_loc[0]-1,cur_loc[1]),False)
+            else:
+                option_from_north = None
+            if cur_loc[1]>0:
+                option_from_west = self.nw_path_next((cur_loc[0],cur_loc[1]-1),False)
+            else:
+                option_from_west = None
+            if option_from_north is None and option_from_west is None:
+                self.nearest_weakly_nw[cur_loc] = (-1,-1)
+                return None
+            if option_from_north is None:
+                self.nearest_weakly_nw[cur_loc] = cast(Tuple[int,int],option_from_west)
+                return option_from_west
+            if option_from_west is None:
+                self.nearest_weakly_nw[cur_loc] = cast(Tuple[int,int],option_from_north)
+                return option_from_north
+            if option_from_north==option_from_west:
+                self.nearest_weakly_nw[cur_loc] = cast(Tuple[int,int],option_from_west)
+                return option_from_west
+            dist_to_option_from_north = (cur_loc[0]-option_from_north[0])**dist_power+\
+                (cur_loc[1]-option_from_north[1])**dist_power
+            dist_to_option_from_west = (cur_loc[0]-option_from_west[0])**dist_power+\
+                (cur_loc[1]-option_from_west[1])**dist_power
+            if dist_to_option_from_north<dist_to_option_from_west:
+                self.nearest_weakly_nw[cur_loc] = option_from_north
+                return option_from_north
+            if dist_to_option_from_north>dist_to_option_from_west:
+                self.nearest_weakly_nw[cur_loc] = option_from_west
+                return option_from_west
+            raise ValueError("There should have been a unique nearest")
+        # strictly northwest
+        one_step_nw = self.filling[cur_loc[0]-1][cur_loc[1]-1]
+        if one_step_nw:
+            self.nearest_strictly_nw[cur_loc] = (cur_loc[0]-1,cur_loc[1]-1)
+            return (cur_loc[0]-1,cur_loc[1]-1)
+        option_from_north = self.nw_path_next((cur_loc[0]-1,cur_loc[1]),True)
+        option_from_west = self.nw_path_next((cur_loc[0],cur_loc[1]-1),True)
+        if option_from_north is None and option_from_west is None:
+            self.nearest_strictly_nw[cur_loc] = (-1,-1)
+            return None
+        if option_from_north is None:
+            self.nearest_strictly_nw[cur_loc] = cast(Tuple[int,int],option_from_west)
+            return option_from_west
+        if option_from_west is None:
+            self.nearest_strictly_nw[cur_loc] = option_from_north
+            return option_from_north
+        if option_from_north==option_from_west:
+            self.nearest_strictly_nw[cur_loc] = option_from_west
+            return option_from_west
+        dist_to_option_from_north = (cur_loc[0]-option_from_north[0])**dist_power+\
+            (cur_loc[1]-option_from_north[1])**dist_power
+        dist_to_option_from_west = (cur_loc[0]-option_from_west[0])**dist_power+\
+            (cur_loc[1]-option_from_west[1])**dist_power
+        if dist_to_option_from_north<dist_to_option_from_west:
+            self.nearest_strictly_nw[cur_loc] = option_from_north
+            return option_from_north
+        if dist_to_option_from_north>dist_to_option_from_west:
+            self.nearest_strictly_nw[cur_loc] = option_from_west
+            return option_from_west
+        raise ValueError("There should have been a unique nearest")
+
+    def make_jagged_bdry_labels(self,
+                                bounding_k : int,
+                                bounding_n : int)\
+                                      -> List[Tuple[Tuple[int,int],bool]]:
+        """
+        the lines on the
+        jagged northeast->southwest lattice path
+        the lines are labelled by the box not on the shape
+        they are also adjacent to
+        and whether using the left side of this box
+        or the top side of this box
+        """
+        if bounding_k<=0 or bounding_n-bounding_k<=0:
+            raise ValueError("Dimensions of bounding box should be positive")
+        if bounding_k<self.height or bounding_n-bounding_k<self.width:
+            raise ValueError(f"Want to fit inside a {bounding_k} by {bounding_n-bounding_k} box")
+        extra_verticals_at_bottom = bounding_k-self.height
+        extra_horizontals_at_top = bounding_n-bounding_k-self.width
+        cur_box = (0,self.width)
+        cur_bdry_vertical = True
+        jagged_bdry_labels: List[Tuple[Tuple[int,int],bool]] = []
+        empty_bool_list : List[bool] = []
+        for _ in range(self.width+self.height):
+            jagged_bdry_labels.append((cur_box,cur_bdry_vertical))
+            if cur_bdry_vertical:
+                if len(safe_index(self.filling,cur_box[0]+1,empty_bool_list))==cur_box[1]:
+                    cur_box = (cur_box[0]+1,cur_box[1])
+                    cur_bdry_vertical = True
+                else:
+                    cur_box = (cur_box[0]+1,cur_box[1]-1)
+                    cur_bdry_vertical = False
+            else:
+                if self.column_height(cur_box[1]-1) == cur_box[0]:
+                    cur_box = (cur_box[0],cur_box[1]-1)
+                    cur_bdry_vertical = False
+                else:
+                    cur_box = (cur_box[0],cur_box[1])
+                    cur_bdry_vertical = True
+        jagged_bdry_labels_prepend = \
+            [((0,self.width+i),False) for i in range(extra_horizontals_at_top)]
+        jagged_bdry_labels_prepend.reverse()
+        jagged_bdry_labels_append = \
+            [((self.height+i,0),True) for i in range(extra_verticals_at_bottom)]
+        return jagged_bdry_labels_prepend+jagged_bdry_labels+jagged_bdry_labels_append
+
+    def row_col_labels(self,bounding_k : int, bounding_n : int) -> Tuple[List[int],List[int]]:
+        """
+        the row labels and column labels using the jagged boundary southwest path
+        each row of the diagram ends with a row label
+        each column of the diagram ends with a column label
+        return both of these
+        """
+        jagged_bdry_labels = self.make_jagged_bdry_labels(bounding_k,bounding_n)
+        row_labels = [0]*self.height
+        col_labels = [0]*self.width
+        idx_in_row_labels = 0
+        idx_in_col_labels = 0
+        for (box_number,(jagged_bdry_box,left_side_of_it)) in enumerate(jagged_bdry_labels):
+            if left_side_of_it and idx_in_row_labels<self.height:
+                row_labels[idx_in_row_labels] = box_number+1
+                idx_in_row_labels += 1
+            elif jagged_bdry_box[1]<self.width:
+                col_labels[idx_in_col_labels] = box_number+1
+                idx_in_col_labels += 1
+        col_labels.reverse()
+        return (row_labels,col_labels)
+
+    def to_grassmann_necklace(self,bounding_k : int, bounding_n : int) -> List[Set[int]]:
+        """
+        to Grassmann necklace
+        I_i+1 is only different from I_i in possibly removing i from I_i
+        and replacing it by something not in I_i
+        each being bounding_k element subsets of 1..bounding_n
+        """
+        (row_labels,col_labels) = self.row_col_labels(bounding_k, bounding_n)
+        return_val : List[Set[int]] = [set()]*bounding_n
+        return_val[0] = set(row_labels)
+        for (idx,starting_box) in enumerate(self.southeast_bdry):
+            if idx+1 not in return_val[idx]:
+                return_val[idx+1] = set()
+                return_val[idx+1].update(return_val[idx])
+                continue
+            rows_seen_labels = []
+            cols_seen_labels = []
+            for cur_box in self.nw_path(starting_box,True):
+                cur_row_seen = row_labels[cur_box[0]]
+                cur_col_seen = col_labels[cur_box[1]]
+                rows_seen_labels.append(cur_row_seen)
+                cols_seen_labels.append(cur_col_seen)
+            set_i_cur = return_val[0].difference(rows_seen_labels)
+            set_i_cur.update(cols_seen_labels)
+            return_val[idx+1] = set_i_cur
+        return return_val
+
+    @staticmethod
+    def from_grassmann_necklace(grassmann_necklace : List[Set[int]],
+                                bounding_k : Optional[int]=None,
+                                bounding_n : Optional[int]=None) -> "LeDiagram":
+        """
+        construct Le diagram from a Grassmann necklace
+        """
+        if bounding_n is None:
+            bounding_n = len(grassmann_necklace)
+        elif len(grassmann_necklace) != bounding_n:
+            raise ValueError(
+                f"The Grassmann necklace of type {(bounding_k,bounding_n)} has {bounding_n} sets")
+        if bounding_n == 0:
+            raise ValueError("Dimensions of bounding box should be positive")
+        if bounding_k is None:
+            bounding_k = len(grassmann_necklace[0])
+        if bounding_k<=0 or bounding_n-bounding_k<=0:
+            raise ValueError("Dimensions of bounding box should be positive")
+        if any(len(cur_set) != bounding_k for cur_set in grassmann_necklace):
+            raise ValueError(
+                " ".join([f"In a Grassmann necklace of type {(bounding_k,bounding_n)}",
+                          "all sets have {bounding_k} elements"]))
+        if any(not cur_set.issubset(range(1,bounding_n+1)) for cur_set in grassmann_necklace):
+            raise ValueError(
+                " ".join([f"In a Grassmann necklace of type {(bounding_k,bounding_n)}",
+                          "all sets are subsets of 1..{bounding_n}"]))
+        set_i_1 = grassmann_necklace[0]
+        list_i_1 = list(set_i_1)
+        list_i_1.sort()
+        my_filling : List[List[bool]] = []
+        first_part = bounding_n-bounding_k-list_i_1[0]+1
+        my_filling.append([False]*first_part)
+        prev_row_label = list_i_1[0]
+        prev_part_len = first_part
+        for cur_row_label in list_i_1[1:]:
+            next_part_len = prev_part_len - (cur_row_label-prev_row_label-1)
+            my_filling.append([False]*next_part_len)
+            prev_row_label = cur_row_label
+            prev_part_len = next_part_len
+
+        no_filled_le = LeDiagram(my_filling)
+        (row_labels,col_labels) = no_filled_le.row_col_labels(bounding_k, bounding_n)
+        label_to_row = {}
+        for idx,cur_row_label in enumerate(row_labels):
+            label_to_row[cur_row_label] = idx
+        label_to_col = {}
+        for idx,cur_col_label in enumerate(col_labels):
+            label_to_col[cur_col_label] = idx
+
+        for set_i_cur in grassmann_necklace[1:]:
+            set_i_cur_minus_i_1 = set_i_cur.difference(set_i_1)
+            set_i_1_minus_set_i_cur = set_i_1.difference(set_i_cur)
+            all_as = list(set_i_1_minus_set_i_cur)
+            all_as.sort(reverse=True)
+            all_bs = list(set_i_cur_minus_i_1)
+            all_bs.sort()
+            for (cur_row_label,cur_col_label) in zip(all_as,all_bs):
+                which_row = label_to_row[cur_row_label]
+                which_col = label_to_col[cur_col_label]
+                my_filling[which_row][which_col] = True
+        return LeDiagram(my_filling)
 
     def to_plabic(self) -> PlabicGraph:
         """
@@ -358,6 +637,11 @@ class LeDiagram:
             " ".join(["1" if z else "0" for z in cur_row])
             for cur_row in self.filling])
 
+    def __eq__(self,other) -> bool:
+        if not isinstance(other,LeDiagram):
+            return False
+        return self.filling == other.filling
+
 if __name__ == "__main__":
 
     try:
@@ -376,6 +660,15 @@ if __name__ == "__main__":
     print(my_Le)
     print(my_Le.ones_data)
     print(my_Le.column_height(0))
+    print(my_Le.make_jagged_bdry_labels(4,9))
+    print(my_Le.make_jagged_bdry_labels(5,10))
+    print(my_Le.make_jagged_bdry_labels(7,15))
+    print(f"Path starting at {(0,4)} is {list(my_Le.nw_path((0,4),True))}")
+    print(f"Path starting at {(1,3)} is {list(my_Le.nw_path((1,3),True))}")
+    print(f"Path starting at {(2,1)} is {list(my_Le.nw_path((2,1),True))}")
+    print(f"Path starting at {(3,1)} is {list(my_Le.nw_path((3,1),True))}")
+    print(f"Southeast boundary : {my_Le.southeast_bdry}")
+    print(f"Grassmann necklace : {my_Le.to_grassmann_necklace(4,9)}")
     p = my_Le.to_plabic()
     p.draw(show_node_names=False)
 
@@ -386,3 +679,33 @@ if __name__ == "__main__":
     my_Le = LeDiagram(my_diagram)
     p = my_Le.to_plabic()
     p.draw(show_node_names=False)
+
+    # example to Grassmann necklace
+    # from https://arxiv.org/pdf/1803.01726.pdf
+    my_diagram = [[1,1,0,0,1],[1,1,0,1],[0,1]]
+    my_Le = LeDiagram(my_diagram)
+    obs_necklace = my_Le.to_grassmann_necklace(3,8)
+    def from_multidigit_int(multi_digit : int) -> Set[int]:
+        """
+        when n is <=9
+        can give the subset of 1..n
+        as just concatenation
+        """
+        return {int(i) for i in str(multi_digit)}
+    exp_necklace_nums = [136,236,367,467,678,678,178,168]
+    exp_necklace = [from_multidigit_int(z) for z in exp_necklace_nums]
+    exp_necklace_2 = [set([1,3,6]),set([2,3,6]),set([3,6,7]),
+                    set([4,6,7]),set([6,7,8]),set([6,7,8]),
+                    set([1,7,8]),set([1,6,8])]
+    assert exp_necklace == exp_necklace_2
+    assert obs_necklace == exp_necklace
+
+    # example from Grassmann necklace
+    # from https://arxiv.org/pdf/1803.01726.pdf
+    necklace_nums = [1247, 2347, 3478, 4678, 5678, 4678, 1478, 1478]
+    necklace = [from_multidigit_int(z) for z in necklace_nums]
+    print(necklace)
+    my_Le = LeDiagram.from_grassmann_necklace(necklace,4,8)
+    print(my_Le)
+    exp_Le = LeDiagram([[1,0,0,1],[1,1,0,1],[0,0,1],[0]])
+    assert my_Le.filling == exp_Le.filling

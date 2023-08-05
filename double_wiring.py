@@ -181,6 +181,7 @@ if __name__ == "__main__":
     assert p.is_bipartite()
     assert p.my_perfect_matching == set([("wire1,0","wire2,0",1),("wire2,0","wire1,0",2)])
     p.draw(draw_oriented_if_perfect = False)
+    
     double_word = [1,-1]
     dw = WiringDiagram(2,double_word)
     p = dw.to_plabic()
