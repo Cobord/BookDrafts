@@ -87,8 +87,7 @@ class PlanarNetwork:
             else:
                 raise ValueError(
                     "Either edge_list must be given or both chip_word and chip_weights")
-        self.chip_type: Optional[ChipWord] = [
-        ] if chip_word is None else chip_word
+        self.chip_type: Optional[ChipWord] = [] if chip_word is None else chip_word
         for stage in edge_list:
             already_incremented = []
             for edge in stage:
