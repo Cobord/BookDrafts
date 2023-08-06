@@ -36,9 +36,12 @@ class YoungDiagram:
         """
         self.my_partition = my_partition
         self.my_partition.sort(reverse=True)
+        if self.my_partition[-1]==0:
+            first_zero = self.my_partition.index(0)
+            self.my_partitition = self.my_partition[0:first_zero]
         self.my_n = sum(self.my_partition)
 
-    def append(self, new_last: int) -> 'YoungDiagram':
+    def append(self, new_last: int) -> YoungDiagram:
         """
         a new partition which appends another part
         """
@@ -103,7 +106,7 @@ class NilpotentOrbit:
     """
 
     # pylint:disable = too-many-branches
-    def __init__(self, my_partition: 'YoungDiagram',
+    def __init__(self, my_partition: YoungDiagram,
                  decorator: Optional[bool] = None,
                  lie_type=LieType.SL_N):
         """
@@ -199,8 +202,14 @@ class NilpotentOrbit:
         """
         describe this nilpotent orbit
         """
+        if self.decorator is None:
+            decorator_str = ""
+        elif self.decorator:
+            decorator_str = "+"
+        else:
+            decorator_str = "-"
         return " ".join(["The nilpotent orbit corresponding",
-                         f"to partition {self.my_diagram}",
+                         f"to partition {self.my_diagram}{decorator_str}",
                          f"in type {self.my_type.letter()} {self.lie_rank}"])
 
     def __eq__(self, other) -> bool:
@@ -248,16 +257,16 @@ class NilpotentOrbit:
                 "Lie type must be one of the 4 classical families")
         return n_val
 
-    @classmethod
-    def next_orbit(cls, my_type: LieType, lie_rank: Nat):
+    @staticmethod
+    def next_orbit(my_type: LieType, lie_rank: Nat, max_part : Optional[int] = None) -> Iterator[NilpotentOrbit]:
         """
         generator going through all orbits of specified Lie algebra
         doesn't necessarily follow the partial order of orbit closure
         but it does tend to
         in particular the all 1's for the zero orbit is at the end
         """
-        n_val = cls._rank_2_n(my_type, lie_rank)
-        for diagram in YoungDiagram.next_partition(n_val):
+        n_val = NilpotentOrbit._rank_2_n(my_type, lie_rank)
+        for diagram in YoungDiagram.next_partition(n_val,max_part):
             try:
                 if my_type is LieType.D:
                     this_orbit = NilpotentOrbit(
@@ -274,13 +283,13 @@ class NilpotentOrbit:
             except ValueError:
                 pass
 
-    @classmethod
-    def special_orbit(cls, my_type: LieType, lie_rank: Nat) -> Dict[str, "NilpotentOrbit"]:
+    @staticmethod
+    def special_orbit(my_type: LieType, lie_rank: Nat) -> Dict[str, NilpotentOrbit]:
         """
         construct all the specially named orbits of the corresponding Lie algebra
         the special names are principal, subregular, minimal and zero
         """
-        n_val = cls._rank_2_n(my_type, lie_rank)
+        n_val = NilpotentOrbit._rank_2_n(my_type, lie_rank)
         if my_type is LieType.A:
             prin_part = [n_val]
             subreg_part = [n_val-1, 1]
@@ -320,14 +329,48 @@ class NilpotentOrbit:
                 "Zero": zero_orbit}
 
     def is_in_closure(self, other) -> bool:
-        """is other in closure of self"""
-        self_closure = self.closure()
-        return other in self_closure
+        """
+        is other in closure of self
+        other <= self
+        using Gerstenhaber-Hesselink theorem
+        relating it to dominance order
+        """
+        if self.my_type != other.my_type or self.lie_rank != other.lie_rank:
+            raise TypeError("The two orbits must be in the same Lie algebra")
+        if self.my_type not in [LieType.A,LieType.B,LieType.C,LieType.D]:
+            raise ValueError(
+                "Lie type must be one of the 4 classical families")
+        self_part_lengths = self.my_diagram.as_list().copy()
+        other_part_lengths = other.my_diagram.as_list().copy()
+        self_extend_zero_num = len(other_part_lengths) - len(self_part_lengths)
+        other_extend_zero_num = -self_extend_zero_num
+        self_part_lengths += [0]*self_extend_zero_num
+        other_part_lengths += [0]*other_extend_zero_num
+        other_up_to_k = 0
+        self_up_to_k = 0
+        for _k_cur,(cur_self_part,cur_other_part) in \
+            enumerate(zip(self_part_lengths,other_part_lengths)):
+            self_up_to_k += cur_self_part
+            other_up_to_k += cur_other_part
+            if other_up_to_k > self_up_to_k:
+                return False
+        return True
 
-    def closure(self) -> List["NilpotentOrbit"]:
-        """which orbits are in the closure of self"""
-        raise NotImplementedError
+    def closure(self) -> Iterator[NilpotentOrbit]:
+        """
+        which orbits are in the closure of self
+        """
+        self_max_part = self.my_diagram.as_list()[0]
+        return (orbit for orbit
+                in NilpotentOrbit.next_orbit(self.my_type,self.lie_rank,self_max_part)
+                if self.is_in_closure(orbit))
 
     def minimal_degeneration(self) -> List["NilpotentOrbit"]:
         """explain minimal degeneration"""
-        raise NotImplementedError
+        raise NotImplementedError("minimal degeneration of orbit")
+
+
+if __name__ == "__main__":
+    for z in NilpotentOrbit.next_orbit(LieType.D,4):
+        print(z)
+        print([str(y) for y in z.closure()])
