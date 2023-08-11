@@ -2,16 +2,13 @@
 plabic graph
 PLAnar BIColored
 """
-
+# pylint:disable=too-many-lines
 from __future__ import annotations
 from enum import Enum, auto
 from typing import Tuple, Optional, List, Dict, cast, Any, Callable, Set
 import itertools
 import networkx as nx
 import matplotlib.pyplot as plt
-
-# pylint:disable=too-many-lines
-
 
 class BiColor(Enum):
     """
@@ -23,9 +20,7 @@ class BiColor(Enum):
 
 ExtraData = Dict[str, Any]
 
-# pylint:disable=too-many-public-methods
-
-
+# pylint:disable=too-many-public-methods,too-many-instance-attributes
 class PlabicGraph:
     """
     built on top of a directed multigraph
@@ -70,6 +65,7 @@ class PlabicGraph:
             raise ValueError("The boundary vertices must all be distinct")
         if any(z not in my_init_data for z in all_bdry_vertices):
             raise ValueError("The boundary vertices must all have data")
+        self.my_extra_props : Set[str] = set()
         self.my_external_nodes = external_init_orientation
         self.my_internal_bdry = internal_bdry_orientations
         self.all_bdry_nodes = all_bdry_vertices
@@ -136,8 +132,9 @@ class PlabicGraph:
         for prop_name, prop_val in props.items():
             if prop_name not in ["is_interior", "color"]:
                 self.my_graph.nodes[vertex][prop_name] = prop_val
+                self.my_extra_props.add(prop_name)
 
-    def remove_prop(self, prop_name):
+    def remove_prop(self, prop_name : str):
         """
         remove a property from all nodes
         """
@@ -148,6 +145,7 @@ class PlabicGraph:
                 del self.my_graph.nodes[cur_node][prop_name]
             except KeyError:
                 pass
+        self.my_extra_props.discard(prop_name)
 
     def boundary_connectivity(self):
         """
@@ -370,6 +368,34 @@ class PlabicGraph:
                 return tgt, flipped
         raise ValueError(
             f"Nothing with edge number {desired_edge_number} out of {src} found")
+
+    def greedy_shrink(self,
+                      name_combiner : Optional[Callable[[str,str],str]] = None,
+                      rounds_left : int = 5) -> bool:
+        """
+        do as many M2 and M3 that remove vertices or edges
+        provided no extra data is present
+        """
+        if rounds_left>=5 and not self.my_extra_props.issubset([]):
+            return False
+        name_combiner = name_combiner if name_combiner is not None else lambda z1,_: z1
+        any_change = False
+        all_edges = list(self.my_graph.edges(keys=False))
+        for name1,name2 in all_edges:
+            if name1 in self.my_graph.nodes() and name2 in self.my_graph.nodes():
+                did_remove,_ = self.contract_edge(name1,name2,name_combiner(name1,name2))
+            else:
+                did_remove = False
+            any_change = any_change or did_remove
+        all_node_names = list(self.my_graph.nodes())
+        for name in all_node_names:
+            did_remove,_ = self.remove_bivalent(name)
+            any_change = any_change or did_remove
+        if not any_change:
+            return False
+        if rounds_left>0:
+            _ = self.greedy_shrink(name_combiner,rounds_left-1)
+        return True
 
     def square_move(self, four_nodes: Tuple[str, str, str, str]) -> Tuple[bool, str]:
         """

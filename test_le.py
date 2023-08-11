@@ -33,7 +33,9 @@ def test_Le1() -> None:
     print(my_Le.column_height(3) == 2)
     print(my_Le.column_height(4) == 1)
     print(my_Le.column_height(5) == 0)
-    _p = my_Le.to_plabic()
+    p = my_Le.to_plabic()
+    assert p.my_extra_props == set(["position"])
+    assert p.my_perfect_matching is None
 
 def test_rectangle() -> None:
     """
@@ -43,7 +45,9 @@ def test_rectangle() -> None:
     k,n = 5,4
     my_diagram = [[1]*k]*n
     my_Le = LeDiagram(my_diagram)
-    _p = my_Le.to_plabic()
+    p = my_Le.to_plabic()
+    assert p.my_extra_props == set(["position"])
+    assert p.my_perfect_matching is None
 
 def from_multidigit_int(multi_digit : int) -> Set[int]:
     """
@@ -68,6 +72,9 @@ def test_to_Grassmann() -> None:
                     set([1,7,8]),set([1,6,8])]
     assert exp_necklace == exp_necklace_2
     assert obs_necklace == exp_necklace
+    p = my_Le.to_plabic()
+    assert p.my_extra_props == set(["position"])
+    assert p.my_perfect_matching is None
 
 def test_from_Grassmann() -> None:
     """
@@ -81,3 +88,6 @@ def test_from_Grassmann() -> None:
     print(my_Le)
     exp_Le = LeDiagram([[1,0,0,1],[1,1,0,1],[0,0,1],[0]])
     assert my_Le.filling == exp_Le.filling
+    p = my_Le.to_plabic()
+    assert p.my_extra_props == set(["position"])
+    assert p.my_perfect_matching is None

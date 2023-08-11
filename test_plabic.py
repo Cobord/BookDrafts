@@ -2,6 +2,7 @@
 test Plabic graphs
 """
 #pylint:disable=import-error,too-many-locals
+from typing import List,Dict
 from plabic import PlabicGraph,BiColor
 
 def test_plabic() -> None:
@@ -33,6 +34,7 @@ def test_plabic() -> None:
     my_data["int7"] = (BiColor.GREEN, ["int4", "ext3", "int8"])
     my_data["int8"] = (BiColor.RED, ["int6", "int7", "ext4"])
     example_plabic = PlabicGraph(my_data, external_orientation, {})
+    assert example_plabic.my_extra_props.issubset([])
     expected_one_steps = ["int1", "int2", "int7", "int8", "int6", "int5"]
     expected_two_steps = ["int2", "int1", "int8", "int7", "int3", "ext6"]
     for cur_bdry_temp, exp_one_step, exp_two_step in\
@@ -49,24 +51,34 @@ def test_plabic() -> None:
                          "ext3":"ext5","ext4":"ext1",
                          "ext5":"ext2","ext6":"ext6"}
     expected_decorated = {"ext6":BiColor.GREEN}
-    for cur_bdry_temp in external_orientation:
-        turn_color, cur_tgt = example_plabic.bdry_to_bdry(cur_bdry_temp)
-        assert cur_tgt == expected_perm[cur_bdry_temp]
-        assert turn_color == expected_decorated.get(cur_bdry_temp,None)
+    correct_decorated_permutation(example_plabic,external_orientation,
+                                  expected_perm,expected_decorated)
     changed, explanation = example_plabic.square_move(("int1", "int2", "int4", "int3"))
     assert changed and explanation == "Success"
-    for cur_bdry_temp in external_orientation:
-        turn_color, cur_tgt = example_plabic.bdry_to_bdry(cur_bdry_temp)
-        assert cur_tgt == expected_perm[cur_bdry_temp]
-        assert turn_color == expected_decorated.get(cur_bdry_temp,None)
+    correct_decorated_permutation(example_plabic,external_orientation,
+                                  expected_perm,expected_decorated)
     changed, explanation = example_plabic.square_move(("int1", "int2", "int4", "int3"))
     assert changed and explanation == "Success"
-    for cur_bdry_temp in external_orientation:
-        turn_color, cur_tgt = example_plabic.bdry_to_bdry(cur_bdry_temp)
-        assert cur_tgt == expected_perm[cur_bdry_temp]
-        assert turn_color == expected_decorated.get(cur_bdry_temp,None)
+    correct_decorated_permutation(example_plabic,external_orientation,
+                                  expected_perm,expected_decorated)
     changed, explanation = example_plabic.flip_move("int4", "int7")
     assert changed and explanation == "Success"
+    correct_decorated_permutation(example_plabic,external_orientation,
+                                  expected_perm,expected_decorated)
+    simplifies = example_plabic.greedy_shrink()
+    assert simplifies
+    simplifies = example_plabic.greedy_shrink()
+    assert not simplifies
+    correct_decorated_permutation(example_plabic,external_orientation,
+                                  expected_perm,expected_decorated)
+
+def correct_decorated_permutation(example_plabic : PlabicGraph,
+                                        external_orientation : List[str],
+                                        expected_perm : Dict[str,str],
+                                        expected_decorated : Dict[str,BiColor]):
+    """
+    assert that the decorated permutation is as expected
+    """
     for cur_bdry_temp in external_orientation:
         turn_color, cur_tgt = example_plabic.bdry_to_bdry(cur_bdry_temp)
         assert cur_tgt == expected_perm[cur_bdry_temp]

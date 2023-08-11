@@ -24,7 +24,8 @@ def test_dw1() -> None:
     ]
     for expected_chamber_minor,chamber_minor in zip(expected_chamber_minors,dw.chamber_minors()):
         assert chamber_minor == expected_chamber_minor
-    _p = dw.to_plabic()
+    p = dw.to_plabic()
+    assert p.my_extra_props == set(["position"])
 
 def test_dw2() -> None:
     """
@@ -46,6 +47,7 @@ def test_dw3() -> None:
     dw = WiringDiagram(2,double_word)
     p = dw.to_plabic()
     assert p.is_bipartite()
+    assert p.my_extra_props == set(["position","my_perfect_edge"])
     assert p.my_perfect_matching == set([("wire1,0","wire2,0",1),("wire2,0","wire1,0",2)])
 
 def test_dw4() -> None:
@@ -55,6 +57,7 @@ def test_dw4() -> None:
     double_word = [1,-1]
     dw = WiringDiagram(2,double_word)
     p = dw.to_plabic()
+    assert p.my_extra_props == set(["position","my_perfect_edge"])
     assert p.my_perfect_matching == set([("wire1,0","wire2,0",1),
                                          ("wire2,0","wire1,0",2),
                                          ("wire1,1","wire2,1",1),
