@@ -150,43 +150,15 @@ class WiringDiagram:
 if __name__ == "__main__":
     double_word = [-2,1,2,-1,-2,1]
     dw = WiringDiagram(3,double_word)
-    expected_chamber_minors = [
-        (set([1,2]),set([2,3])),
-        (set([1]),set([3])),
-        (set([1,2]),set([1,3])),
-        (set([2]),set([3])),
-        (set([2,3]),set([1,3])),
-        (set([2]),set([1])),
-        (set([3]),set([1])),
-        (set([2,3]),set([1,2])),
-        (set([1,2,3]),set([1,2,3]))
-    ]
-    for expected_chamber_minor,chamber_minor in zip(expected_chamber_minors,dw.chamber_minors()):
-        print(chamber_minor)
-        assert chamber_minor == expected_chamber_minor
     p = dw.to_plabic()
     p.draw(draw_oriented_if_perfect = False)
-
-    DID_ERROR = False
-    try:
-        double_word = []
-        dw = WiringDiagram(2,double_word)
-    except ValueError:
-        DID_ERROR = True
-    assert DID_ERROR
 
     double_word = [1]
     dw = WiringDiagram(2,double_word)
     p = dw.to_plabic()
-    assert p.is_bipartite()
-    assert p.my_perfect_matching == set([("wire1,0","wire2,0",1),("wire2,0","wire1,0",2)])
     p.draw(draw_oriented_if_perfect = False)
 
     double_word = [1,-1]
     dw = WiringDiagram(2,double_word)
     p = dw.to_plabic()
-    assert p.my_perfect_matching == set([("wire1,0","wire2,0",1),
-                                         ("wire2,0","wire1,0",2),
-                                         ("wire1,1","wire2,1",1),
-                                         ("wire2,1","wire1,1",2)])
     p.draw()

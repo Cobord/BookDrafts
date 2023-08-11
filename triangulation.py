@@ -5,7 +5,7 @@ Triangulation of convex m-gon
 from typing import Tuple,Set,List,Union,cast,Dict,Any
 from functools import reduce
 from math import sin, cos, pi as PI, atan2
-
+#pylint:disable=import-error
 from plabic import PlabicGraph, BiColor
 
 Point = Tuple[float,float]

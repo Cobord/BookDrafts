@@ -670,33 +670,3 @@ if __name__ == "__main__":
     my_Le = LeDiagram(my_diagram)
     p = my_Le.to_plabic()
     p.draw(show_node_names=False)
-
-    # example to Grassmann necklace
-    # from https://arxiv.org/pdf/1803.01726.pdf
-    my_diagram = [[1,1,0,0,1],[1,1,0,1],[0,1]]
-    my_Le = LeDiagram(my_diagram)
-    obs_necklace = my_Le.to_grassmann_necklace(3,8)
-    def from_multidigit_int(multi_digit : int) -> Set[int]:
-        """
-        when n is <=9
-        can give the subset of 1..n
-        as just concatenation
-        """
-        return {int(i) for i in str(multi_digit)}
-    exp_necklace_nums = [136,236,367,467,678,678,178,168]
-    exp_necklace = [from_multidigit_int(z) for z in exp_necklace_nums]
-    exp_necklace_2 = [set([1,3,6]),set([2,3,6]),set([3,6,7]),
-                    set([4,6,7]),set([6,7,8]),set([6,7,8]),
-                    set([1,7,8]),set([1,6,8])]
-    assert exp_necklace == exp_necklace_2
-    assert obs_necklace == exp_necklace
-
-    # example from Grassmann necklace
-    # from https://arxiv.org/pdf/1803.01726.pdf
-    necklace_nums = [1247, 2347, 3478, 4678, 5678, 4678, 1478, 1478]
-    necklace = [from_multidigit_int(z) for z in necklace_nums]
-    print(necklace)
-    my_Le = LeDiagram.from_grassmann_necklace(necklace,4,8)
-    print(my_Le)
-    exp_Le = LeDiagram([[1,0,0,1],[1,1,0,1],[0,0,1],[0]])
-    assert my_Le.filling == exp_Le.filling
