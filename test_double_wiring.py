@@ -26,6 +26,8 @@ def test_dw1() -> None:
         assert chamber_minor == expected_chamber_minor
     p = dw.to_plabic()
     assert p.my_extra_props == set(["position"])
+    did_scale_up = p.coordinate_transform(lambda z: (z[0]*2,z[1]*2))
+    assert did_scale_up
 
 def test_dw2() -> None:
     """
@@ -49,6 +51,8 @@ def test_dw3() -> None:
     assert p.is_bipartite()
     assert p.my_extra_props == set(["position","my_perfect_edge"])
     assert p.my_perfect_matching == set([("wire1,0","wire2,0",1),("wire2,0","wire1,0",2)])
+    did_scale_up = p.coordinate_transform(lambda z: (z[0]*2,z[1]*2))
+    assert did_scale_up
 
 def test_dw4() -> None:
     """
@@ -62,3 +66,5 @@ def test_dw4() -> None:
                                          ("wire2,0","wire1,0",2),
                                          ("wire1,1","wire2,1",1),
                                          ("wire2,1","wire1,1",2)])
+    did_scale_up = p.coordinate_transform(lambda z: (z[0]*2,z[1]*2))
+    assert did_scale_up

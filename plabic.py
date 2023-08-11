@@ -5,10 +5,13 @@ PLAnar BIColored
 # pylint:disable=too-many-lines
 from __future__ import annotations
 from enum import Enum, auto
+import numbers
 from typing import Tuple, Optional, List, Dict, cast, Any, Callable, Set
 import itertools
 import networkx as nx
 import matplotlib.pyplot as plt
+
+Point = Tuple[float,float]
 
 class BiColor(Enum):
     """
@@ -867,6 +870,49 @@ class PlabicGraph:
 
         return True, "Success"
 
+    def find_affine_transformation(self,other:PlabicGraph,
+                                   glued_vertices : List[str])\
+                                    -> Tuple[bool,Callable[[Point],Point]]:
+        """
+        find an affine transformation
+        taking the positions of the glued vertices in self
+        to the corresponding positions in other
+        """
+        try:
+            all_positions_self = {
+                    z: self.my_graph.nodes[z]["position"] for z in glued_vertices}
+            all_positions_other = {
+                    z: other.my_graph.nodes[z]["position"] for z in glued_vertices}
+        except KeyError:
+            return False,lambda z: z
+        if all_positions_self == all_positions_other:
+            return True,lambda z: z
+        raise NotImplementedError
+
+    def coordinate_transform(self,transform : Callable[[Point],Point]) -> bool:
+        """
+        does transform on all positions of all nodes
+        """
+        def point_like(maybe_point) -> bool:
+            """
+            is p in R^2
+            """
+            return isinstance(maybe_point,tuple) and len(maybe_point)==2 and\
+                isinstance(maybe_point[0],numbers.Real) and isinstance(maybe_point[1],numbers.Real)
+        all_are_points = True
+        for node_name in self.my_graph.nodes():
+            old_position = self.my_graph.nodes[node_name].get("position",None)
+            if not point_like(old_position):
+                print(f"{node_name} gave {old_position}")
+                all_are_points = False
+                break
+        if all_are_points:
+            for node_name in self.my_graph.nodes():
+                old_position = self.my_graph.nodes[node_name]["position"]
+                new_position = transform(old_position)
+                self.my_graph.nodes[node_name]["position"] = new_position
+        return all_are_points
+
     def operad_compose(self, other: PlabicGraph, which_internal_disk: int) -> Tuple[bool, str]:
         """
         substitute other in on the i'th internal circle of self
@@ -913,6 +959,16 @@ class PlabicGraph:
                     other.get_color(other_tgt) is None:
                 return False,\
                     "Boundary vertices should connect to internal vertices not directly to boundary"
+        if "position" in self.my_extra_props and "position" in other.my_extra_props:
+            found_transformation, affine_transform = \
+                self.find_affine_transformation(other,relevant_internal)
+            if found_transformation:
+                self.coordinate_transform(affine_transform)
+                clear_position = False
+            else:
+                clear_position = True
+        else:
+            clear_position = True
 
         self.all_bdry_nodes = self.my_external_nodes
         new_internal_bdry: List[List[str]] = \
@@ -950,6 +1006,8 @@ class PlabicGraph:
                                     "then the composition would make it bivalent"])
                 raise ValueError(new_msg)
 
+        if clear_position:
+            self.remove_prop("position")
         # clears everything to do with perfect orientation
         # could fix the perfect orientation instead
         # along this move
@@ -1063,10 +1121,14 @@ class PlabicGraph:
 
         all_node_names = list(self.my_graph.nodes())
         all_colors = [name_to_color(z) for z in all_node_names]
-        try:
-            all_positions = {
-                z: self.my_graph.nodes[z]["position"] for z in all_node_names}
-        except KeyError:
+        if "position" in self.my_extra_props:
+            try:
+                all_positions = {
+                    z: self.my_graph.nodes[z]["position"] for z in all_node_names}
+            except KeyError:
+                self.remove_prop("position")
+                all_positions = None
+        else:
             all_positions = None
 
         something_transparent = "#0f0f0f00"

@@ -36,6 +36,8 @@ def test_Le1() -> None:
     p = my_Le.to_plabic()
     assert p.my_extra_props == set(["position"])
     assert p.my_perfect_matching is None
+    did_scale_up = p.coordinate_transform(lambda z: (z[0]*2,z[1]*2))
+    assert did_scale_up
 
 def test_rectangle() -> None:
     """
@@ -48,6 +50,8 @@ def test_rectangle() -> None:
     p = my_Le.to_plabic()
     assert p.my_extra_props == set(["position"])
     assert p.my_perfect_matching is None
+    did_scale_up = p.coordinate_transform(lambda z: (z[0]*2,z[1]*2))
+    assert did_scale_up
 
 def from_multidigit_int(multi_digit : int) -> Set[int]:
     """
@@ -75,6 +79,8 @@ def test_to_Grassmann() -> None:
     p = my_Le.to_plabic()
     assert p.my_extra_props == set(["position"])
     assert p.my_perfect_matching is None
+    did_scale_up = p.coordinate_transform(lambda z: (z[0]*2,z[1]*2))
+    assert did_scale_up
 
 def test_from_Grassmann() -> None:
     """
@@ -91,3 +97,5 @@ def test_from_Grassmann() -> None:
     p = my_Le.to_plabic()
     assert p.my_extra_props == set(["position"])
     assert p.my_perfect_matching is None
+    did_scale_up = p.coordinate_transform(lambda z: (z[0]*2,z[1]*2))
+    assert did_scale_up

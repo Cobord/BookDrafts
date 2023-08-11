@@ -71,6 +71,8 @@ def test_plabic() -> None:
     assert not simplifies
     correct_decorated_permutation(example_plabic,external_orientation,
                                   expected_perm,expected_decorated)
+    did_scale_up = example_plabic.coordinate_transform(lambda z: (z[0]*2,z[1]*2))
+    assert not did_scale_up
 
 def correct_decorated_permutation(example_plabic : PlabicGraph,
                                         external_orientation : List[str],
