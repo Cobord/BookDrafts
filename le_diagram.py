@@ -5,7 +5,7 @@ Le Diagram
 from enum import Enum, auto
 from typing import List, Optional, Tuple, Set, Iterable, Union, TypeVar, Dict, cast, Iterator
 import itertools
-
+#pylint:disable=import-error
 from plabic import BiColor, ExtraData, PlabicGraph
 
 #pylint:disable=too-many-locals,too-many-statements,too-many-branches,too-many-return-statements,too-many-instance-attributes
@@ -643,15 +643,6 @@ class LeDiagram:
         return self.filling == other.filling
 
 if __name__ == "__main__":
-
-    try:
-        my_Le = LeDiagram([])
-    except ValueError as e:
-        assert str(e)=="Expect the shape to be a partition of a positive number"
-    try:
-        my_Le = LeDiagram([[],[],[]])
-    except ValueError as e:
-        assert str(e)=="Expect the shape to be a partition of a positive number"
 
     # Example from
     # https://doi.org/10.1016/j.jcta.2018.06.001

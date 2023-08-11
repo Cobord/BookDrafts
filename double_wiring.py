@@ -5,7 +5,7 @@ also include single wiring diagram
 
 from functools import reduce
 from typing import Tuple,List,Dict,Iterator,Set,Any,cast
-
+#pylint:disable=import-error
 from plabic import PlabicGraph, BiColor
 
 Point = Tuple[float,float]

@@ -258,7 +258,8 @@ class NilpotentOrbit:
         return n_val
 
     @staticmethod
-    def next_orbit(my_type: LieType, lie_rank: Nat, max_part : Optional[int] = None) -> Iterator[NilpotentOrbit]:
+    def next_orbit(my_type: LieType, lie_rank: Nat,
+                   max_part : Optional[int] = None) -> Iterator[NilpotentOrbit]:
         """
         generator going through all orbits of specified Lie algebra
         doesn't necessarily follow the partial order of orbit closure
