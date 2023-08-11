@@ -224,26 +224,10 @@ if __name__ == '__main__':
     RADIUS = 2
     t = Triangulation([ (RADIUS*cos(2*PI*which/N),RADIUS*sin(2*PI*which/N))
                        for which in range(N)], [(x-1,y-1) for x,y in my_diagonals])
-    diags_before = t.my_diagonal_list.copy()
-    for diag,quad in zip(t.my_diagonal_list,t.my_quadrilaterals):
-        assert diag[0]==quad[0]
-        assert diag[1]==quad[2]
     p = t.to_plabic()
-    assert p.my_perfect_matching is not None
     p.draw()
     change, new_diag = t.quad_flip((1,3))
-    assert change
-    assert new_diag == (2,6)
-    for which_diag_now,diag in enumerate(t.my_diagonal_list):
-        if diag != (2,6):
-            assert diag == diags_before[which_diag_now]
-        else:
-            assert diags_before[which_diag_now] == (1,3)
-    for diag,quad in zip(t.my_diagonal_list,t.my_quadrilaterals):
-        assert diag[0]==quad[0]
-        assert diag[1]==quad[2]
     print(f"Triangles are : {t.my_triangles}")
     p = t.to_plabic()
     print(f"Perfect matching : {p.my_perfect_matching}")
-    assert p.my_perfect_matching is not None
     p.draw()

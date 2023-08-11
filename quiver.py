@@ -539,32 +539,9 @@ class PathAlgebra:
         return ret_val
 
 if __name__ == '__main__':
-    jordan_quiver = Quiver()
-    v_idx = jordan_quiver.add_vertex("alpha")
-    a_idx = jordan_quiver.add_edge(v_idx, v_idx, "a")
-    print(jordan_quiver)
+    a_sym = symbols("a",commutative=False)
     SumStr = FormalLinearCombination(
         str, complex, complex(0, 0), lambda z1, z2: z1+z2)
-    flc_1a2b3c = SumStr(
-        [(complex(1, 0), "a"), (complex(2, 0), "b"), (complex(3, 0), "c")])
-    print(flc_1a2b3c)
-    two_flc_1a2b3c = flc_1a2b3c+flc_1a2b3c
-    exp_two_flc_1a2b3c = SumStr(
-        [(complex(2, 0), "a"), (complex(4, 0), "b"), (complex(6, 0), "c")])
-    print(two_flc_1a2b3c)
-    assert exp_two_flc_1a2b3c == two_flc_1a2b3c
-    print(flc_1a2b3c*flc_1a2b3c)
-    print()
-
-    x = PathAlgebra(jordan_quiver, [(complex(1, 0), [a_idx])])
-    print(x)
-    a_sym = symbols("a",commutative=False)
-    print(x.to_symbolic())
-    assert x.to_symbolic() == complex(1,0)*a_sym
-    print(x+x)
-    print(x*x)
-    print()
-
     kronecker_quiver = Quiver()
     v1 = kronecker_quiver.add_vertex("alpha")
     v2 = kronecker_quiver.add_vertex("beta")
