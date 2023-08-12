@@ -23,6 +23,153 @@ class BiColor(Enum):
 
 ExtraData = Dict[str, Any]
 
+# pylint:disable = too-many-instance-attributes
+class PlabicGraphBuilder:
+    """
+    PlabicGraph constructor arguments are complicated to offload this process
+    to PlabicGraphBuilder
+    """
+    my_init_data : Dict[str, Tuple[BiColor, List[str]]]
+    num_external_vertices : int
+    is_set_externals : List[bool]
+    external_init_orientation : List[str]
+    multi_edge_permutation : Dict[Tuple[str, str], Dict[int, int]]
+    internal_circles_nums : List[int]
+    is_set_internals : List[List[bool]]
+    internal_bdry_orientations: Optional[List[List[str]]]
+    extra_node_props: Optional[Dict[str, ExtraData]]
+    have_multi_edges : Set[Tuple[str,str]]
+
+    def __init__(self):
+        self.my_init_data = {}
+        self.num_external_vertices = 0
+        self.is_set_externals = []
+        self.external_init_orientation = []
+        self.multi_edge_permutation = {}
+        self.internal_circles_nums = []
+        self.is_set_internals = []
+        self.internal_bdry_orientations = None
+        self.extra_node_props = None
+        self.have_multi_edges = set()
+
+    def set_num_external(self,num_ext : int) -> None:
+        """
+        set the number of vertices on the outside boundary
+        """
+        if num_ext<0:
+            raise ValueError("Num external vertices should be nonnegative")
+        self.num_external_vertices = num_ext
+        self.external_init_orientation = [""]*num_ext
+        self.is_set_externals = [False]*num_ext
+
+    def set_internal_circles_nums(self,internal_circles_nums : List[int]):
+        """
+        set the number of internal boundaries and how many vertices are on each
+        """
+        if any(z<0 for z in internal_circles_nums):
+            raise ValueError("Num vertices on an internal boundary should all be nonnegative")
+        self.internal_circles_nums = internal_circles_nums
+        self.is_set_internals = [[False]*z for z in internal_circles_nums]
+        self.internal_bdry_orientations = [[""]*z for z in internal_circles_nums]
+
+    def set_extras(self, vertex_name : str, extras : Optional[ExtraData] = None):
+        """
+        set the extra_node_props for a specific vertex
+        """
+        if extras is not None:
+            if self.extra_node_props is None:
+                self.extra_node_props = {}
+            self.extra_node_props[vertex_name] = extras
+
+    def add_internal_vertex(self,vertex_name : str, color : BiColor,
+                            clockwise_nhbrs : List[str],
+                            extras : Optional[ExtraData] = None) -> None:
+        """
+        add an internal vertex by it's color and it's half-edges around it
+        the half-edges are in clockwise order, they give the vertex at the other
+        end
+        any extra information want on that node is also provided
+        """
+        for name in clockwise_nhbrs:
+            if clockwise_nhbrs.count(name)>1:
+                self.have_multi_edges.add((vertex_name,name))
+                self.have_multi_edges.add((name,vertex_name))
+        self.my_init_data[vertex_name] = (color,clockwise_nhbrs)
+        self.set_extras(vertex_name,extras)
+
+    def add_external_bdry_vertex(self,external_vertex_name : str,
+                            idx : int, my_internal_connection : str,
+                            extras : Optional[ExtraData] = None) -> None:
+        """
+        add a boundary vertex on the external boundary by it's only neighbor
+        any extra information want on that node is also provided
+        it is placed on the external boundary in position provided by idx
+        you must have done set_num_external before this so we know what
+        range idx is regarded as taking values in
+        """
+        if idx<0 or idx>=self.num_external_vertices:
+            raise ValueError(f"{self.num_external_vertices} external vertices allowed")
+        self.my_init_data[external_vertex_name] = (BiColor.RED,[my_internal_connection])
+        self.external_init_orientation[idx] = external_vertex_name
+        self.is_set_externals[idx] = True
+        self.set_extras(external_vertex_name,extras)
+
+    # pylint:disable=too-many-arguments
+    def add_internal_bdry_vertex(self,internal_bdry_vertex_name : str,
+                            which_circle : int,
+                            where_in_that_circle : int,
+                            my_internal_connection : str,
+                            extras : Optional[ExtraData] = None) -> None:
+        """
+        add a boundary vertex on an internal boundary by it's only neighbor
+        any extra information want on that node is also provided
+        it is placed on the internal boundary which_circle in position provided by
+        where_in_that_circle
+        you must have done set_internal_circles_nums before this so we know what
+        range which_circle and where_in_that_circle are regarded as taking values in
+        """
+        if self.internal_bdry_orientations is None:
+            raise ValueError(
+                "Should have set the number and sizes of the internal boundaries already")
+        if which_circle<0 or which_circle>=len(self.internal_circles_nums):
+            raise ValueError(
+                f"{which_circle} is not one of the available internal circles")
+        if where_in_that_circle<0 or where_in_that_circle>=self.internal_circles_nums[which_circle]:
+            raise ValueError(
+                f"{where_in_that_circle} is not available on internal circle {which_circle}")
+        self.my_init_data[internal_bdry_vertex_name] = (BiColor.RED,[my_internal_connection])
+        self.internal_bdry_orientations[which_circle][where_in_that_circle] = \
+            internal_bdry_vertex_name
+        self.is_set_internals[which_circle][where_in_that_circle] = True
+        self.set_extras(internal_bdry_vertex_name,extras)
+
+    def set_multi_edges(self,vertex_a : str, vertex_b: str, how_keys_match : Dict[int,int]) -> None:
+        """
+        set the permutation of half-edges if there are multiple edges connecting
+        vertex_a and vertex_b
+        """
+        self.multi_edge_permutation[(vertex_a,vertex_b)] = how_keys_match
+
+    def build(self) -> PlabicGraph:
+        """
+        use all the instance attributes in arguments to
+        PlabicGraph construction
+        """
+        if not all(self.is_set_externals):
+            raise ValueError("Not finished setting externals")
+        if self.is_set_internals is not None and not all(all(z) for z in self.is_set_internals):
+            raise ValueError("Not finished setting internals")
+        for (vertex_a,vertex_b) in self.have_multi_edges:
+            ab_in_multi = (vertex_a,vertex_b) in self.multi_edge_permutation
+            ba_in_multi = (vertex_b,vertex_a) in self.multi_edge_permutation
+            if not ab_in_multi and not ba_in_multi:
+                raise ValueError("Not finished setting for multi-edges")
+        return PlabicGraph(self.my_init_data,
+                 self.external_init_orientation,
+                 self.multi_edge_permutation,
+                 self.internal_bdry_orientations,
+                 self.extra_node_props)
+
 # pylint:disable=too-many-public-methods,too-many-instance-attributes
 class PlabicGraph:
     """
@@ -36,6 +183,7 @@ class PlabicGraph:
     all_bdry_nodes: List[str]
     multi_edge_permutation: Dict[Tuple[str, str], Dict[int, int]]
     my_perfect_matching: Optional[Set[Tuple[str, str, int]]]
+    my_extra_props : Set[str]
 
     # pylint:disable = too-many-arguments, too-many-locals, too-many-branches,too-many-statements
     def __init__(self, my_init_data: Dict[str, Tuple[BiColor, List[str]]],
@@ -60,7 +208,7 @@ class PlabicGraph:
         else:
             self.num_interior_circles = len(internal_bdry_orientations)
         self.my_graph = nx.MultiDiGraph()
-        all_bdry_vertices = external_init_orientation
+        all_bdry_vertices = external_init_orientation.copy()
         for internal_circle_num in range(self.num_interior_circles):
             all_bdry_vertices.extend(
                 internal_bdry_orientations[internal_circle_num])
@@ -159,7 +307,7 @@ class PlabicGraph:
         self.my_graph.add_node(
             infinity_node, is_interior=False, color=BiColor.RED)
         for edge_idx, bdry in enumerate(self.my_external_nodes):
-            self.my_graph.add_edge(infinity_node, bdry, edge_number=edge_idx)
+            self.my_graph.add_edge(infinity_node, bdry, edge_idx)
         if not nx.is_weakly_connected(self.my_graph):
             self.my_graph.remove_node(infinity_node)
             raise ValueError(
@@ -587,6 +735,8 @@ class PlabicGraph:
         side_2, idx_from_side_2 = self.by_edge_number(my_bivalent_vertex, 1)
         if side_2 == my_bivalent_vertex:
             return False, "No self loops for this implementation of remove bivalent to work"
+        if self.get_color(side_1) is None and self.get_color(side_2) is None:
+            return False, "Cannot cause two boundary nodes to connect directly"
         num_side_1_to_side_2 = self.num_connecting_edges(side_1, side_2)
         if num_side_1_to_side_2 > 1:
             old_dict_12 = self.multi_edge_permutation.get(
@@ -597,6 +747,9 @@ class PlabicGraph:
             all_keys_12 = list(self.my_graph[side_1][side_2].keys())
             all_keys_21 = list(self.my_graph[side_2][side_1].keys())
             old_dict_12 = {all_keys_12[0]: all_keys_21[0]}
+            old_dict_21 = None
+        if num_side_1_to_side_2 == 0:
+            old_dict_12 = None
             old_dict_21 = None
         for adj in [side_1, side_2]:
             if self.multi_edge_permutation.get((my_bivalent_vertex, adj), None) is not None:
