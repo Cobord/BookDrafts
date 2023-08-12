@@ -74,6 +74,7 @@ def test_plabic() -> None:
     did_scale_up = example_plabic.coordinate_transform(lambda z: (z[0]*2,z[1]*2))
     assert not did_scale_up
 
+# pylint:disable = too-many-statements
 def test_builder():
     """
     same example as before but with an internal circle
