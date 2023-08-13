@@ -10,6 +10,7 @@ from typing import Tuple, Optional, List, Dict, cast, Any, Callable, Set
 import itertools
 import networkx as nx
 import matplotlib.pyplot as plt
+from framed_2_disks import FramedDiskConfig
 
 Point = Tuple[float,float]
 
@@ -184,13 +185,15 @@ class PlabicGraph:
     multi_edge_permutation: Dict[Tuple[str, str], Dict[int, int]]
     my_perfect_matching: Optional[Set[Tuple[str, str, int]]]
     my_extra_props : Set[str]
+    circles_config : Optional[FramedDiskConfig]
 
     # pylint:disable = too-many-arguments, too-many-locals, too-many-branches,too-many-statements
     def __init__(self, my_init_data: Dict[str, Tuple[BiColor, List[str]]],
                  external_init_orientation: List[str],
                  multi_edge_permutation: Dict[Tuple[str, str], Dict[int, int]],
                  internal_bdry_orientations: Optional[List[List[str]]] = None,
-                 extra_node_props: Optional[Dict[str, ExtraData]] = None):
+                 extra_node_props: Optional[Dict[str, ExtraData]] = None,
+                 my_circles_config : Optional[FramedDiskConfig] = None):
         """
         provide the data of the graph by a dictionary
         the keys are the names of the vertices
@@ -274,6 +277,10 @@ class PlabicGraph:
         self.boundary_connectivity()
         self.my_perfect_matching: Optional[Set[Tuple[str, str, int]]] = set()
         self.__my_perfect_matching_fix(any_self_loops)
+        if my_circles_config is not None:
+            raise NotImplementedError(
+                "are all the boundary vertices on the circles they are supposed to be")
+        self.circles_config = None
 
     def __add_props(self, vertex: str, props: ExtraData):
         """
@@ -1023,8 +1030,10 @@ class PlabicGraph:
 
         return True, "Success"
 
-    def find_affine_transformation(self,other:PlabicGraph,
-                                   glued_vertices : List[str])\
+    def find_affine_transformation(self,which_internal_disk : int,
+                                   other:PlabicGraph,
+                                   glued_vertices : List[str],
+                                   force_it : bool = False)\
                                     -> Tuple[bool,Callable[[Point],Point]]:
         """
         find an affine transformation
@@ -1040,6 +1049,18 @@ class PlabicGraph:
             return False,lambda z: z
         if all_positions_self == all_positions_other:
             return True,lambda z: z
+        if self.circles_config is not None and other.circles_config is not None:
+            trans_found,supposed_transformation = \
+                self.circles_config.find_transformation(which_internal_disk,other.circles_config)
+            if trans_found:
+                transformed_self = {z1:supposed_transformation(cast(Point,z2))
+                                    for (z1,z2) in all_positions_self.items()}
+                if transformed_self == all_positions_other:
+                    return True,supposed_transformation
+            if not force_it:
+                return False,lambda z: z
+        if not force_it:
+            return False,lambda z: z
         raise NotImplementedError
 
     def coordinate_transform(self,transform : Callable[[Point],Point]) -> bool:
@@ -1056,7 +1077,7 @@ class PlabicGraph:
         for node_name in self.my_graph.nodes():
             old_position = self.my_graph.nodes[node_name].get("position",None)
             if not point_like(old_position):
-                print(f"{node_name} gave {old_position}")
+                # print(f"{node_name} gave {old_position}")
                 all_are_points = False
                 break
         if all_are_points:
@@ -1114,7 +1135,7 @@ class PlabicGraph:
                     "Boundary vertices should connect to internal vertices not directly to boundary"
         if "position" in self.my_extra_props and "position" in other.my_extra_props:
             found_transformation, affine_transform = \
-                self.find_affine_transformation(other,relevant_internal)
+                self.find_affine_transformation(which_internal_disk, other,relevant_internal)
             if found_transformation:
                 self.coordinate_transform(affine_transform)
                 clear_position = False
@@ -1258,7 +1279,9 @@ class PlabicGraph:
              oriented_arrows: str = "black",
              unoriented_arrows_perfect: str = "yellow",
              unoriented_arrows_imperfect: str = "black",
-             overridden_arrow_orientation : Optional[Callable[[str,str,int],bool]] = None
+             overridden_arrow_orientation : Optional[Callable[[str,str,int],bool]] = None,
+             external_circle_color : str = "black",
+             internal_circles_color : str = "black"
              ) -> None:
         """
         draw the multigraph without regard to it's planar embedding
@@ -1325,5 +1348,9 @@ class PlabicGraph:
         nx.draw(self.my_graph, pos=all_positions,
                 node_color=all_colors, edge_color=edge_colors,
                 arrows=draw_arrowheads, with_labels=show_node_names)
+        if self.circles_config is not None:
+            self.circles_config.draw(
+                external_circle_color=external_circle_color,
+                internal_circles_color=internal_circles_color)
         plt.draw()
         plt.show()
