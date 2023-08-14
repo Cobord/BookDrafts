@@ -274,13 +274,15 @@ class PlabicGraph:
                 tgt_to_src_dict = multi_edge_permutation.get((tgt, src), None)
                 self.__multi_edge_permutation_add(src, tgt, src_to_tgt_dict,
                                                   tgt_to_src_dict, num_src_tgt)
-        self.boundary_connectivity()
+        self.__boundary_connectivity()
         self.my_perfect_matching: Optional[Set[Tuple[str, str, int]]] = set()
         self.__my_perfect_matching_fix(any_self_loops)
-        if my_circles_config is not None:
-            raise NotImplementedError(
-                "are all the boundary vertices on the circles they are supposed to be")
+
         self.circles_config = None
+        if my_circles_config is not None:
+            self.circles_config = my_circles_config
+            # raise NotImplementedError(
+            #    "are all the boundary vertices on the circles they are supposed to be")
 
     def __add_props(self, vertex: str, props: ExtraData):
         """
@@ -305,7 +307,7 @@ class PlabicGraph:
                 pass
         self.my_extra_props.discard(prop_name)
 
-    def boundary_connectivity(self):
+    def __boundary_connectivity(self):
         """
         make sure every internal vertex is connected to some external boundary vertex
         """
@@ -321,7 +323,7 @@ class PlabicGraph:
                 "Every internal vertex should be connected to some boundary vertex")
         self.my_graph.remove_node(infinity_node)
 
-    def clear_perfect_matching(self):
+    def __clear_perfect_matching(self):
         """
         clears everything to do with perfect orientation
         """
@@ -335,17 +337,17 @@ class PlabicGraph:
         possibly after ignoring some of the boundary vertices
         """
         if any_self_loops:
-            self.clear_perfect_matching()
+            self.__clear_perfect_matching()
             return
         if not self.is_bipartite():
-            self.clear_perfect_matching()
+            self.__clear_perfect_matching()
             return
         all_node_names = list(self.my_graph.nodes())
         try:
             special_edge_numbers = {
                 z: self.my_graph.nodes[z]["my_perfect_edge"] for z in all_node_names}
         except KeyError:
-            self.clear_perfect_matching()
+            self.__clear_perfect_matching()
             return
         self.my_perfect_matching: Optional[Set[Tuple[str, str, int]]] = set()
         already_partnered: Dict[str, str] = {}
@@ -356,13 +358,13 @@ class PlabicGraph:
                         f"Should not have seen {src_name} as a source yet")
                 already_partnered[src_name] = tgt_name
                 if already_partnered.get(tgt_name, src_name) != src_name:
-                    self.clear_perfect_matching()
+                    self.__clear_perfect_matching()
                     return
                 self.my_perfect_matching.add((src_name, tgt_name, edge_key))
         for src_name in self.my_graph:
             if src_name not in already_partnered and \
                     self.my_graph.nodes[src_name]["is_interior"]:
-                self.clear_perfect_matching()
+                self.__clear_perfect_matching()
                 break
 
     def __multi_edge_permutation_add(self, src: str, tgt: str,
@@ -513,7 +515,7 @@ class PlabicGraph:
             return False
         return this_color != that_color
 
-    def by_edge_number(self, src: str, desired_edge_number: int) -> Tuple[str, int]:
+    def _by_edge_number(self, src: str, desired_edge_number: int) -> Tuple[str, int]:
         """
         the target of the half-edge starting at src
         with the desired edge number in the cyclic ordering
@@ -533,6 +535,8 @@ class PlabicGraph:
         """
         do as many M2 and M3 that remove vertices or edges
         provided no extra data is present
+        the name_combiner tells what to do with names on the
+        contract edge moves
         """
         if rounds_left>=5 and not self.my_extra_props.issubset([]):
             return False
@@ -594,7 +598,7 @@ class PlabicGraph:
         # clears everything to do with perfect orientation
         # could fix the perfect orientation instead
         # along this move
-        self.clear_perfect_matching()
+        self.__clear_perfect_matching()
 
         return True, "Success"
 
@@ -648,25 +652,25 @@ class PlabicGraph:
         if edge_number_a >= 3:
             edge_number_a -= 3
         vertex_a, halfedge_number_from_a = \
-            self.by_edge_number(this_vertex, edge_number_a)
+            self._by_edge_number(this_vertex, edge_number_a)
 
         edge_number_b = cut_edge_number_this - 1
         if edge_number_b < 0:
             edge_number_b += 3
         vertex_b, halfedge_number_from_b = \
-            self.by_edge_number(this_vertex, edge_number_b)
+            self._by_edge_number(this_vertex, edge_number_b)
 
         edge_number_d = cut_edge_number_that + 1
         if edge_number_d >= 3:
             edge_number_d -= 3
         vertex_d, halfedge_number_from_d = \
-            self.by_edge_number(that_vertex, edge_number_d)
+            self._by_edge_number(that_vertex, edge_number_d)
 
         edge_number_c = cut_edge_number_that - 1
         if edge_number_c < 0:
             edge_number_c += 3
         vertex_c, halfedge_number_from_c = \
-            self.by_edge_number(that_vertex, edge_number_c)
+            self._by_edge_number(that_vertex, edge_number_c)
 
         for node_to_go in [this_vertex, that_vertex]:
             adjacencies = list(self.my_graph[node_to_go])
@@ -722,7 +726,7 @@ class PlabicGraph:
         # clears everything to do with perfect orientation
         # could fix the perfect orientation instead
         # along this move
-        self.clear_perfect_matching()
+        self.__clear_perfect_matching()
 
         return True, "Success"
 
@@ -736,10 +740,10 @@ class PlabicGraph:
         should_be_2 = self.my_graph.out_degree(my_bivalent_vertex)
         if should_be_2 != 2:
             return False, f"{my_bivalent_vertex} needs to be bivalent"
-        side_1, idx_from_side_1 = self.by_edge_number(my_bivalent_vertex, 0)
+        side_1, idx_from_side_1 = self._by_edge_number(my_bivalent_vertex, 0)
         if side_1 == my_bivalent_vertex:
             return False, "No self loops for this implementation of remove bivalent to work"
-        side_2, idx_from_side_2 = self.by_edge_number(my_bivalent_vertex, 1)
+        side_2, idx_from_side_2 = self._by_edge_number(my_bivalent_vertex, 1)
         if side_2 == my_bivalent_vertex:
             return False, "No self loops for this implementation of remove bivalent to work"
         if self.get_color(side_1) is None and self.get_color(side_2) is None:
@@ -776,7 +780,7 @@ class PlabicGraph:
         # clears everything to do with perfect orientation
         # could fix the perfect orientation instead
         # along this move
-        self.clear_perfect_matching()
+        self.__clear_perfect_matching()
 
         return True, "Success"
 
@@ -822,7 +826,7 @@ class PlabicGraph:
         # clears everything to do with perfect orientation
         # could fix the perfect orientation instead
         # along this move
-        self.clear_perfect_matching()
+        self.__clear_perfect_matching()
 
         return True, "Success"
 
@@ -875,13 +879,13 @@ class PlabicGraph:
             this_vertex, that_vertex, key_this_that)
         out_that = self.my_graph.out_degree(that_vertex)
         order_around_combined: List[Tuple[bool, int, Tuple[str, int]]] = []
-        order_around_combined.extend(((True, z, self.by_edge_number(this_vertex, z))
+        order_around_combined.extend(((True, z, self._by_edge_number(this_vertex, z))
                                       for z in range(key_this_that+1, out_this)))
-        order_around_combined.extend(((True, z, self.by_edge_number(this_vertex, z))
+        order_around_combined.extend(((True, z, self._by_edge_number(this_vertex, z))
                                       for z in range(0, key_this_that)))
-        order_around_combined.extend(((False, z, self.by_edge_number(that_vertex, z))
+        order_around_combined.extend(((False, z, self._by_edge_number(that_vertex, z))
                                       for z in range(key_that_this+1, out_that)))
-        order_around_combined.extend(((False, z, self.by_edge_number(that_vertex, z))
+        order_around_combined.extend(((False, z, self._by_edge_number(that_vertex, z))
                                       for z in range(0, key_that_this)))
 
         for node_to_go in [this_vertex, that_vertex]:
@@ -921,7 +925,7 @@ class PlabicGraph:
         # clears everything to do with perfect orientation
         # could fix the perfect orientation instead
         # along this move
-        self.clear_perfect_matching()
+        self.__clear_perfect_matching()
 
         return True, "Success"
 
@@ -968,7 +972,7 @@ class PlabicGraph:
         seen_on_1 = set()
         will_multiconnect_1 = set()
         for on_1_key, on_this_key in enumerate(go_to_1):
-            tgt, on_tgt_key = self.by_edge_number(this_vertex, on_this_key)
+            tgt, on_tgt_key = self._by_edge_number(this_vertex, on_this_key)
             go_to_1_full.append((on_1_key, tgt, on_tgt_key))
             if tgt in seen_on_1:
                 will_multiconnect_1.add(tgt)
@@ -977,7 +981,7 @@ class PlabicGraph:
         seen_on_2 = set()
         will_multiconnect_2 = set()
         for on_2_key, on_this_key in enumerate(go_to_2):
-            tgt, on_tgt_key = self.by_edge_number(this_vertex, on_this_key)
+            tgt, on_tgt_key = self._by_edge_number(this_vertex, on_this_key)
             go_to_2_full.append((on_2_key, tgt, on_tgt_key))
             if tgt in seen_on_2:
                 will_multiconnect_2.add(tgt)
@@ -1026,19 +1030,20 @@ class PlabicGraph:
         # clears everything to do with perfect orientation
         # could fix the perfect orientation instead
         # along this move
-        self.clear_perfect_matching()
+        self.__clear_perfect_matching()
 
         return True, "Success"
 
-    def find_affine_transformation(self,which_internal_disk : int,
+    def __operad_compose_helper(self,which_internal_disk : int,
                                    other:PlabicGraph,
                                    glued_vertices : List[str],
                                    force_it : bool = False)\
                                     -> Tuple[bool,Callable[[Point],Point]]:
         """
-        find an affine transformation
+        find a transformation
         taking the positions of the glued vertices in self
         to the corresponding positions in other
+        does that transformation to self.circles_config
         """
         try:
             all_positions_self = {
@@ -1046,24 +1051,44 @@ class PlabicGraph:
             all_positions_other = {
                     z: other.my_graph.nodes[z]["position"] for z in glued_vertices}
         except KeyError:
+            # something didn't have position so can't trust circles_config
+            # or positions in the operad composition
+            # circles_config is removed here
+            # the False output tells operad_compose to clear position property
+            self.circles_config = None
+            return False,lambda z: z
+        if self.circles_config is not None and other.circles_config is not None:
+            supposed_transformation = \
+                self.circles_config.do_transformation(which_internal_disk,other.circles_config)
+            transformed_self = {z1:supposed_transformation(cast(Point,z2))
+                                for (z1,z2) in all_positions_self.items()}
+            if transformed_self == all_positions_other:
+                # the transformations of the framed circles accomplished the task
+                # the circles_config has already changed
+                # the points will all change later in operad_compose
+                return True,supposed_transformation
+            # the transformations of the framed circles failed the task
+            # circles_config is removed here
+            # the False output tells operad_compose to clear position property
+            self.circles_config = None
             return False,lambda z: z
         if all_positions_self == all_positions_other:
+            # the points lined up but we didn't have both circles_config for self and other
+            # so we can't have one in the composition
+            # but we still have the positions of the vertices in the operad composition
+            self.circles_config = None
             return True,lambda z: z
-        if self.circles_config is not None and other.circles_config is not None:
-            trans_found,supposed_transformation = \
-                self.circles_config.find_transformation(which_internal_disk,other.circles_config)
-            if trans_found:
-                transformed_self = {z1:supposed_transformation(cast(Point,z2))
-                                    for (z1,z2) in all_positions_self.items()}
-                if transformed_self == all_positions_other:
-                    return True,supposed_transformation
-            if not force_it:
-                return False,lambda z: z
         if not force_it:
+            # the points did not line up and we didn't have both circles_config for self and other
+            # so we can't have one in the composition
+            # and we aren't forcing to find an affine transformation that does the task without
+            # the help of FramedDisKConfig
+            self.circles_config = None
             return False,lambda z: z
         raise NotImplementedError
 
-    def coordinate_transform(self,transform : Callable[[Point],Point]) -> bool:
+    def coordinate_transform(self,transform : Callable[[Point],Point],
+                             circle_config_invalidates : bool = True) -> bool:
         """
         does transform on all positions of all nodes
         """
@@ -1081,6 +1106,8 @@ class PlabicGraph:
                 all_are_points = False
                 break
         if all_are_points:
+            if circle_config_invalidates:
+                self.circles_config = None
             for node_name in self.my_graph.nodes():
                 old_position = self.my_graph.nodes[node_name]["position"]
                 new_position = transform(old_position)
@@ -1127,20 +1154,19 @@ class PlabicGraph:
             return False, "The only overlap of vertex names should be the ones that are glued"
 
         for replaced_node in relevant_internal:
-            self_tgt, _ = self.by_edge_number(replaced_node, 0)
-            other_tgt, _ = other.by_edge_number(replaced_node, 0)
+            self_tgt, _ = self._by_edge_number(replaced_node, 0)
+            # pylint:disable = protected-access
+            other_tgt, _ = other._by_edge_number(replaced_node, 0)
             if self.get_color(self_tgt) is None or \
                     other.get_color(other_tgt) is None:
                 return False,\
                     "Boundary vertices should connect to internal vertices not directly to boundary"
         if "position" in self.my_extra_props and "position" in other.my_extra_props:
-            found_transformation, affine_transform = \
-                self.find_affine_transformation(which_internal_disk, other,relevant_internal)
+            found_transformation, my_transform = \
+                self.__operad_compose_helper(which_internal_disk, other,relevant_internal)
+            clear_position = not found_transformation
             if found_transformation:
-                self.coordinate_transform(affine_transform)
-                clear_position = False
-            else:
-                clear_position = True
+                self.coordinate_transform(my_transform,False)
         else:
             clear_position = True
 
@@ -1162,7 +1188,7 @@ class PlabicGraph:
         self.num_interior_circles += other.num_interior_circles - 1
 
         for replaced_node in relevant_internal:
-            tgt, _ = self.by_edge_number(replaced_node, 0)
+            tgt, _ = self._by_edge_number(replaced_node, 0)
             self.my_graph.add_edge(replaced_node, tgt, 1)
             self.my_graph.remove_edge(replaced_node, tgt, 0)
             self.my_graph.nodes[replaced_node]["is_interior"] = True
@@ -1185,7 +1211,7 @@ class PlabicGraph:
         # clears everything to do with perfect orientation
         # could fix the perfect orientation instead
         # along this move
-        self.clear_perfect_matching()
+        self.__clear_perfect_matching()
 
         return True, "Success"
 
@@ -1233,7 +1259,7 @@ class PlabicGraph:
             if not at_this_node in self.all_bdry_nodes:
                 raise ValueError(
                     "If don't have a previous vertex, we must be at a boundary vertex")
-            return_name, _ = self.by_edge_number(at_this_node, 0)
+            return_name, _ = self._by_edge_number(at_this_node, 0)
             return 0, return_name
         if via_edge_keyed is None:
             only_one = self.num_connecting_edges(
@@ -1349,7 +1375,8 @@ class PlabicGraph:
                 node_color=all_colors, edge_color=edge_colors,
                 arrows=draw_arrowheads, with_labels=show_node_names)
         if self.circles_config is not None:
-            self.circles_config.draw(
+            self.circles_config.draw(on_top_of_existing=True,
+                draw_framing=False,
                 external_circle_color=external_circle_color,
                 internal_circles_color=internal_circles_color)
         plt.draw()

@@ -380,7 +380,7 @@ class LeDiagram:
             return option_from_west
         raise ValueError("There should have been a unique nearest")
 
-    def make_jagged_bdry_labels(self,
+    def _make_jagged_bdry_labels(self,
                                 bounding_k : int,
                                 bounding_n : int)\
                                       -> List[Tuple[Tuple[int,int],bool]]:
@@ -425,14 +425,14 @@ class LeDiagram:
             [((self.height+i,0),True) for i in range(extra_verticals_at_bottom)]
         return jagged_bdry_labels_prepend+jagged_bdry_labels+jagged_bdry_labels_append
 
-    def row_col_labels(self,bounding_k : int, bounding_n : int) -> Tuple[List[int],List[int]]:
+    def _row_col_labels(self,bounding_k : int, bounding_n : int) -> Tuple[List[int],List[int]]:
         """
         the row labels and column labels using the jagged boundary southwest path
         each row of the diagram ends with a row label
         each column of the diagram ends with a column label
         return both of these
         """
-        jagged_bdry_labels = self.make_jagged_bdry_labels(bounding_k,bounding_n)
+        jagged_bdry_labels = self._make_jagged_bdry_labels(bounding_k,bounding_n)
         row_labels = [0]*self.height
         col_labels = [0]*self.width
         idx_in_row_labels = 0
@@ -454,7 +454,7 @@ class LeDiagram:
         and replacing it by something not in I_i
         each being bounding_k element subsets of 1..bounding_n
         """
-        (row_labels,col_labels) = self.row_col_labels(bounding_k, bounding_n)
+        (row_labels,col_labels) = self._row_col_labels(bounding_k, bounding_n)
         return_val : List[Set[int]] = [set()]*bounding_n
         return_val[0] = set(row_labels)
         for (idx,starting_box) in enumerate(self.southeast_bdry):
@@ -515,7 +515,8 @@ class LeDiagram:
             prev_part_len = next_part_len
 
         no_filled_le = LeDiagram(my_filling)
-        (row_labels,col_labels) = no_filled_le.row_col_labels(bounding_k, bounding_n)
+        # pylint:disable=protected-access
+        (row_labels,col_labels) = no_filled_le._row_col_labels(bounding_k, bounding_n)
         label_to_row = {}
         for idx,cur_row_label in enumerate(row_labels):
             label_to_row[cur_row_label] = idx
@@ -651,9 +652,10 @@ if __name__ == "__main__":
     print(my_Le)
     print(my_Le.ones_data)
     print(my_Le.column_height(0))
-    print(my_Le.make_jagged_bdry_labels(4,9))
-    print(my_Le.make_jagged_bdry_labels(5,10))
-    print(my_Le.make_jagged_bdry_labels(7,15))
+    # pylint:disable=protected-access
+    print(my_Le._make_jagged_bdry_labels(4,9))
+    print(my_Le._make_jagged_bdry_labels(5,10))
+    print(my_Le._make_jagged_bdry_labels(7,15))
     print(f"Path starting at {(0,4)} is {list(my_Le.nw_path((0,4),True))}")
     print(f"Path starting at {(1,3)} is {list(my_Le.nw_path((1,3),True))}")
     print(f"Path starting at {(2,1)} is {list(my_Le.nw_path((2,1),True))}")

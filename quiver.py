@@ -37,7 +37,7 @@ class Quiver:
         self.edge_names: Dict[EdgeLabel, str] = {}
         self.vertex_names: Dict[VertexLabel, str] = {}
 
-    def add_vertex(self, name: str) -> Nat:
+    def add_vertex(self, name: str) -> VertexLabel:
         """
         add a vertex not connected to anything else
         """
@@ -46,7 +46,7 @@ class Quiver:
         self.next_vertex_label += 1
         return self.next_vertex_label-1
 
-    def add_edge(self, source: Nat, target: Nat, edge_name: str) -> Nat:
+    def add_edge(self, source: VertexLabel, target: VertexLabel, edge_name: str) -> EdgeLabel:
         """
         add an edge connecting the nodes with the given indices
         """
@@ -59,7 +59,7 @@ class Quiver:
         self.next_edge_label += 1
         return self.next_edge_label-1
 
-    def from_edge_name(self, edge_name) -> Optional[Nat]:
+    def from_edge_name(self, edge_name : str) -> Optional[EdgeLabel]:
         """
         the index of the edge with that name
         """

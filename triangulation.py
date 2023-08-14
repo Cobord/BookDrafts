@@ -4,9 +4,11 @@ Triangulation of convex m-gon
 
 from typing import Tuple,Set,List,Union,cast,Dict,Any
 from functools import reduce
-from math import sin, cos, pi as PI, atan2
+import itertools
+from math import sin, cos, pi as PI, atan2, sqrt
 #pylint:disable=import-error
 from plabic import PlabicGraph, BiColor
+from framed_2_disks import FramedDiskConfig
 
 Point = Tuple[float,float]
 
@@ -16,7 +18,7 @@ class Triangulation:
     """
 
     @staticmethod
-    def makes_triangle(idx_1 : int, idx_2 : int,
+    def __makes_triangle(idx_1 : int, idx_2 : int,
                        boxed_off : Set[int],
                        num_points : int) -> Tuple[bool,bool,Union[int,Tuple[int,int]]]:
         """
@@ -58,8 +60,8 @@ class Triangulation:
     def __init__(self,vertices: List[Point], diagonals : List[Tuple[int,int]]):
         self.num_points = len(vertices)
         self.vertices = vertices
-        actually_diagonals = all( (x!=y and 1<=x<=self.num_points and
-                                   1<=y<=self.num_points) for x,y in diagonals)
+        actually_diagonals = all( (x!=y and 0<=x<self.num_points and
+                                   0<=y<self.num_points) for x,y in diagonals)
         if not actually_diagonals:
             raise ValueError("Something was not a diagonal")
         boxed_off : Set[int] = set()
@@ -72,7 +74,7 @@ class Triangulation:
                     continue
                 (from_pt,to_pt) = cur_diagonal
                 is_triangle, both_triangles, newly_boxed =\
-                    self.makes_triangle(from_pt, to_pt, boxed_off,self.num_points)
+                    self.__makes_triangle(from_pt, to_pt, boxed_off,self.num_points)
                 if both_triangles:
                     some_diagonal_worked = True
                     properly_ordered_diagonals.append((from_pt,to_pt,newly_boxed))
@@ -154,13 +156,17 @@ class Triangulation:
         """
         my_init_data : Dict[str,Tuple[BiColor,List[str]]] = {}
         extra_node_props : Dict[str,Dict[str,Any]] = {}
+        scale_factor = 2
+        r2_to_center_all = [0.0]*self.num_points
         for idx in range(self.num_points):
             my_init_data[f"ext{idx}"] = (BiColor.RED,[f"int{idx}"])
             scaled_up_pt = list(self.vertices[idx])
             scaled_up_pt[0] -= self.center[0]
             scaled_up_pt[1] -= self.center[1]
-            scaled_up_pt[0] *= 2
-            scaled_up_pt[1] *= 2
+            scaled_up_pt[0] *= scale_factor
+            scaled_up_pt[1] *= scale_factor
+            r2_to_center = scaled_up_pt[0]**2+scaled_up_pt[1]**2
+            r2_to_center_all[idx] = r2_to_center
             scaled_up_pt[0] += self.center[0]
             scaled_up_pt[1] += self.center[1]
             extra_node_props[f"ext{idx}"] = {"position" : (scaled_up_pt[0],scaled_up_pt[1]),
@@ -198,11 +204,29 @@ class Triangulation:
         external_init_orientation = [f"ext{idx}" for idx in range(self.num_points)]
         multi_edge_permutation : Dict[Tuple[str,str],Dict[int,int]] = {}
         internal_bdry_orientations = None
+        def get_common_radius(r2_all : List[float]) -> Tuple[bool,float]:
+            """
+            given bunch of r^2 for all the vertices relative to self.center
+            are they all on a circle around that center
+            """
+            if len(r2_all) < 2:
+                raise ValueError("m must be at least 3")
+            max_abs_diffs = max(abs(a-b)
+                for (a,b) in itertools.combinations(r2_all,2))
+            if max_abs_diffs<1e-4:
+                return True,sqrt(r2_all[0])
+            return False,0.0
+        has_common_radius, common_radius = get_common_radius(r2_to_center_all)
+        if has_common_radius:
+            my_circles_config = FramedDiskConfig([],(self.center,common_radius,0.0))
+        else:
+            my_circles_config = None
         return PlabicGraph(my_init_data,
                  external_init_orientation,
                  multi_edge_permutation,
                  internal_bdry_orientations,
-                 extra_node_props)
+                 extra_node_props,
+                 my_circles_config)
 
 def clockwise_order(node_names : List[str],
                     prop_dict : Dict[str,Dict[str,Any]],
