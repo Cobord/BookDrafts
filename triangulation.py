@@ -213,7 +213,7 @@ class Triangulation:
                 raise ValueError("m must be at least 3")
             max_abs_diffs = max(abs(a-b)
                 for (a,b) in itertools.combinations(r2_all,2))
-            if max_abs_diffs<1e-4:
+            if max_abs_diffs<1e-6*sum(r2_all)/len(r2_all):
                 return True,sqrt(r2_all[0])
             return False,0.0
         has_common_radius, common_radius = get_common_radius(r2_to_center_all)
