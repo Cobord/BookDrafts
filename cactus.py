@@ -2,8 +2,10 @@
 cactus group J_n
 """
 
+from __future__ import annotations
 from functools import reduce
-from typing import Optional, List, Tuple, Union
+from random import shuffle, sample
+from typing import Optional, List, Tuple, Union, cast
 
 # pylint:disable = line-too-long
 
@@ -20,6 +22,9 @@ class CactusGroup:
         self.name = f"J_{my_n}"
         self.index = my_n
         self.element: List[Tuple[int, int]] = []
+
+    def __str__(self) -> str:
+        return str(self.element)
 
     def to_permutation(self) -> List[int]:
         """
@@ -60,7 +65,7 @@ class CactusGroup:
         self.element.append((my_p, my_q))
         self.simplify(only_last=True)
 
-    def __imul__(self, other: "CactusGroup"):
+    def __imul__(self, other: CactusGroup):
         """
         group multiplication
         """
@@ -72,16 +77,24 @@ class CactusGroup:
             pass
         else:
             last_of_self = len(self.element)-1
-            self.element = self.element+other.element
+            self.element.extend(other.element.copy())
             if last_of_self+1 < len(self.element):
                 _ = self.simplify(
                     only_last=False, possible_pairs=[last_of_self])
         return self
 
-    def __mul__(self, other: "CactusGroup"):
+    def __mul__(self, other: CactusGroup):
         ret_val = CactusGroup(self.index)
         ret_val *= self
         ret_val *= other
+        return ret_val
+
+    def copy(self) -> CactusGroup:
+        """
+        a copy
+        """
+        ret_val = CactusGroup(self.index)
+        ret_val.element = self.element.copy()
         return ret_val
 
     def __eq__(self, other) -> bool:
@@ -140,8 +153,6 @@ class CactusGroup:
                                   for x in possible_pairs if x < try_here or x > try_here+1]
                 if try_here-1 >= 0 and try_here < len(self.element):
                     possible_pairs.append(try_here-1)
-                if try_here+1 < len(self.element):
-                    possible_pairs.append(try_here)
             elif q_2 < p_1:
                 # a commuting pair, but in the wrong order for the normal form
                 changed = True
@@ -163,6 +174,43 @@ class CactusGroup:
                     possible_pairs.append(try_here+1)
         return changed
 
+    @staticmethod
+    def random(my_n : int,my_cact_len : int) -> CactusGroup:
+        """
+        produce a random element of J_{my_n}
+        my_cact_len is a bound for how many generators to use
+        """
+        to_ret = CactusGroup(my_n)
+        one_to_n = list(range(1,my_n+1,1))
+        for _ in range(my_cact_len):
+            tup = cast(Tuple[int,int],tuple(sorted(sample(one_to_n,k=2))))
+            to_ret.append_generator(tup[0],tup[1])
+        to_ret.simplify()
+        return to_ret
+
+    def inv_inplace(self) -> None:
+        """
+        replace self with it's inverse
+        """
+        self.element.reverse()
+
+    def inv(self) -> CactusGroup:
+        """
+        return it's inverse
+        """
+        ret_val = self.copy()
+        ret_val.inv_inplace()
+        return ret_val
+
+    def __itruediv__(self,other : CactusGroup) -> CactusGroup:
+        self *= other.inv()
+        return self
+
+    def __div__(self,other : CactusGroup) -> CactusGroup:
+        ret_val = CactusGroup(self.index)
+        ret_val *= self
+        ret_val /= other
+        return ret_val
 
 def perm_multiply(perm_1: List[int], perm_2: List[int]) -> List[int]:
     """
@@ -177,9 +225,12 @@ class Permutation:
     def __init__(self, my_n: int):
         self.name = f"S_{my_n}"
         self.index = my_n
-        self.element: List[int] = list(range(1,my_n))
+        self.element: List[int] = list(range(1,my_n+1))
 
-    def __imul__(self, other: "Permutation"):
+    def __str__(self) -> str:
+        return str(self.element)
+
+    def __imul__(self, other: Permutation):
         """
         group multiplication
         """
@@ -193,7 +244,7 @@ class Permutation:
             self.element = perm_multiply(self.element, other.element)
         return self
 
-    def __mul__(self, other: "Permutation"):
+    def __mul__(self, other: Permutation):
         ret_val = Permutation(self.index)
         ret_val *= self
         ret_val *= other
@@ -210,11 +261,59 @@ class Permutation:
         if i<1 or i>self.index or j<1 or j>self.index or j<i:
             raise ValueError(f"{i}-{j} not a valid interval for {self.name}")
         presumed_shift = self.element[i-1]-i
-        for idx in range(i+1,j):
+        for idx in range(i+1,j+1):
             cur_shift = self.element[idx-1]-idx
             if cur_shift != presumed_shift:
                 return None
         return presumed_shift
+
+    def copy(self) -> Permutation:
+        """
+        a copy
+        """
+        ret_val = Permutation(self.index)
+        ret_val.element = self.element.copy()
+        return ret_val
+
+    def __eq__(self, other) -> bool:
+        """
+        is self*other^-1 equal to the identity
+        can say they are not equal when they are depending on simplification
+        """
+        if not isinstance(other, Permutation):
+            return False
+        if not self.name == other.name:
+            raise TypeError("Elements of different groups")
+        return self.element == other.element
+
+    @staticmethod
+    def random(my_n : int) -> Permutation:
+        """
+        produce a random element of S_{my_n}
+        """
+        to_ret = Permutation(my_n)
+        shuffle(to_ret.element)
+        return to_ret
+
+    def inv(self) -> Permutation:
+        """
+        return it's inverse
+        """
+        ret_val = self.copy()
+        for idx in range(1,self.index+1):
+            idx_comes_from = self.element.index(idx)+1
+            ret_val.element[idx-1] = idx_comes_from
+        return ret_val
+
+    def __itruediv__(self,other : Permutation) -> Permutation:
+        self *= other.inv()
+        return self
+
+    def __div__(self,other : Permutation) -> Permutation:
+        ret_val = Permutation(self.index)
+        ret_val *= self
+        ret_val /= other
+        return ret_val
 
 class VirtualCactusGroup:
     """
@@ -235,7 +334,7 @@ class VirtualCactusGroup:
         self.index = my_n
         self.element: List[Tuple[CactusGroup, Permutation]] = []
 
-    def __imul__(self, other: Union["VirtualCactusGroup" , "Permutation" , "CactusGroup"]):
+    def __imul__(self, other: Union[VirtualCactusGroup , Permutation , CactusGroup]):
         """
         group multiplication
         """
@@ -250,27 +349,37 @@ class VirtualCactusGroup:
                 self.element.append((CactusGroup(self.index),other))
         elif isinstance(other,CactusGroup):
             other_promoted = VirtualCactusGroup(other.index)
-            other_promoted.element.append((other,Permutation(other.index)))
+            other_promoted.element.append((other.copy(),Permutation(other.index)))
             self *= other_promoted
         else:
             if not self.name == other.name:
                 raise TypeError("Elements of different groups")
             if len(self.element) == 0:
-                self.element = other.element.copy()
+                other_copy = other.copy()
+                self.element = other_copy.element
             elif len(other.element) == 0:
                 pass
             else:
                 last_of_self = len(self.element)-1
-                self.element.extend(other.element.copy())
+                other_copy = other.copy()
+                self.element.extend(other_copy.element)
                 if last_of_self+1 < len(self.element):
                     _ = self.simplify(
                         only_last=False, possible_pairs=[last_of_self])
         return self
 
-    def __mul__(self, other: Union["VirtualCactusGroup" , "Permutation" , "CactusGroup"]):
+    def __mul__(self, other: Union[VirtualCactusGroup , Permutation , CactusGroup]) -> VirtualCactusGroup:
         ret_val = VirtualCactusGroup(self.index)
         ret_val *= self
         ret_val *= other
+        return ret_val
+
+    def copy(self) -> VirtualCactusGroup:
+        """
+        copy everything
+        """
+        ret_val = VirtualCactusGroup(self.index)
+        ret_val.element = [(zi.copy(),zj.copy()) for (zi,zj) in self.element]
         return ret_val
 
     # pylint:disable = too-many-branches,too-many-statements,too-many-locals
@@ -303,7 +412,7 @@ class VirtualCactusGroup:
                 changed = True
                 cactus_part_1*=cactus_part_2
                 self.element[try_here] = (cactus_part_1,sym_part_2)
-                self.element[try_here+1] = (cact_id,perm_id)
+                self.element[try_here+1] = (cact_id.copy(),perm_id.copy())
                 if try_here-1 >= 0 and try_here < len(self.element):
                     possible_pairs.append(try_here-1)
                 if try_here+2 < len(self.element):
@@ -313,7 +422,7 @@ class VirtualCactusGroup:
                 changed = True
                 sym_part_1*=sym_part_2
                 self.element[try_here] = (cactus_part_1,sym_part_1)
-                self.element[try_here+1] = (cact_id,perm_id)
+                self.element[try_here+1] = (cact_id.copy(),perm_id.copy())
                 if try_here-1 >= 0 and try_here < len(self.element):
                     possible_pairs.append(try_here-1)
                 if try_here+2 < len(self.element):
@@ -339,7 +448,7 @@ class VirtualCactusGroup:
                 cactus_part_1*=from_cactus_part_2
                 sym_part_1*=sym_part_2
                 self.element[try_here] = (cactus_part_1,sym_part_1)
-                self.element[try_here+1] = (cact_id,perm_id)
+                self.element[try_here+1] = (cact_id.copy(),perm_id.copy())
             else:
                 cactus_part_2.element = cactus_part_2.element[keep_from_here_on:]
                 cactus_part_1*=from_cactus_part_2
@@ -353,3 +462,64 @@ class VirtualCactusGroup:
         if changed:
             self.element = [(z1,z2) for (z1,z2) in self.element if (z1!=cact_id or z2!=perm_id)]
         return changed
+
+    def __eq__(self, other) -> bool:
+        """
+        is self*other^-1 equal to the identity
+        can say they are not equal when they are depending on simplification
+        """
+        if not isinstance(other, VirtualCactusGroup):
+            return False
+        if not self.name == other.name:
+            raise TypeError("Elements of different groups")
+        self.simplify()
+        other.simplify()
+        if len(self.element) != len(other.element):
+            return False
+        for ((z_i,z_j),(w_i,w_j)) in zip(self.element, other.element):
+            if (z_i!=w_i) or (z_j!=w_j):
+                return False
+        return True
+
+    def __str__(self):
+        return "*".join((str(z_i)+"*"+str(z_j) for (z_i,z_j) in self.element))
+
+    @staticmethod
+    def random(my_n : int,my_cact_len : int,my_free_len : int) -> VirtualCactusGroup:
+        """
+        produce a random element of vJ_{my_n}
+        my_cact_len is a bound for how many generators to use in the J_{my_n} factors
+        my_free_len is a bound for how many alternating J_{my_n} and S_{my_n} factors
+        """
+        to_ret = VirtualCactusGroup(my_n)
+        for _ in range(my_free_len):
+            to_ret.element.append((CactusGroup.random(my_n,my_cact_len),Permutation.random(my_n)))
+        to_ret.simplify()
+        return to_ret
+
+    def inv(self) -> VirtualCactusGroup:
+        """
+        return it's inverse
+        """
+        if len(self.element)==0:
+            return self.copy()
+        ret_val = VirtualCactusGroup(self.index)
+        (z_i,z_j) = self.element[-1]
+        ret_val *= z_j.inv()
+        put_with_next = z_i.inv()
+        for cur_idx in range(len(self.element)-2,-1,-1):
+            (z_i,z_j) = self.element[cur_idx]
+            ret_val.element.append((put_with_next,z_j.inv()))
+            put_with_next = z_i.inv()
+        ret_val.element.append((put_with_next,Permutation(self.index)))
+        return ret_val
+
+    def __itruediv__(self,other : VirtualCactusGroup) -> VirtualCactusGroup:
+        self *= other.inv()
+        return self
+
+    def __div__(self,other : VirtualCactusGroup) -> VirtualCactusGroup:
+        ret_val = VirtualCactusGroup(self.index)
+        ret_val *= self
+        ret_val /= other
+        return ret_val
