@@ -89,6 +89,21 @@ def test_vCactus() -> None:
                     s_messy = s_gens[(p+q-l, p+q-k)]
                     assert spq*skl == s_messy*spq
 
+def test_perm_promoted() -> None:
+    """
+    S_10 included into vJ_10
+    """
+    MY_N = 10
+    perm_1 = Permutation.random(MY_N)
+    perm_2 = Permutation.random(MY_N)
+    perm_1_promoted = VirtualCactusGroup(MY_N)
+    perm_1_promoted *= perm_1
+    perm_2_promoted = VirtualCactusGroup(MY_N)
+    perm_2_promoted *= perm_2
+    perm_12_promoted = VirtualCactusGroup(MY_N)
+    perm_12_promoted *= (perm_1*perm_2)
+    assert perm_1_promoted*perm_2_promoted == perm_12_promoted
+
 def test_random_iden() -> None:
     """
     produce a random element of vJ_3 and check that
