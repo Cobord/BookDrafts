@@ -104,6 +104,82 @@ def test_perm_promoted() -> None:
     perm_12_promoted *= (perm_1*perm_2)
     assert perm_1_promoted*perm_2_promoted == perm_12_promoted
 
+def test_cross_rels() -> None:
+    """
+    the defining ws_ijw^-1 = s_wi,wj relations in vJ_3
+    """
+    MY_N = 5
+
+    s_gens: Dict[Tuple[int, int], VirtualCactusGroup] = {}
+    iden = VirtualCactusGroup(MY_N)
+    # define the s_ij
+    for p in range(1, MY_N):
+        for q in range(p+1, MY_N+1):
+            current_gen = CactusGroup(MY_N)
+            current_gen.append_generator(p, q)
+            current_vgen = iden*current_gen
+            s_gens[(p, q)] = current_vgen
+
+    perm_1 = Permutation.random(MY_N)
+    perm_1_promoted = VirtualCactusGroup(MY_N)
+    perm_1_promoted *= perm_1
+
+    for p in range(1, MY_N):
+        for q in range(p+1, MY_N+1):
+            maybe_k_shift = perm_1.preserves_intervalness(p,q)
+            if maybe_k_shift is None:
+                continue
+            expected_rhs = VirtualCactusGroup(MY_N)
+            expected_rhs_cactus = s_gens[(p+maybe_k_shift,q+maybe_k_shift)]
+            expected_rhs *= expected_rhs_cactus
+            spq = s_gens[(p, q)]
+            lhs = perm_1_promoted*spq
+            lhs /= perm_1_promoted
+            assert lhs==expected_rhs
+
+    perm_1.element = list(range(1,MY_N+1))
+    perm_1.element[0], perm_1.element[1] = perm_1.element[1], perm_1.element[0]
+    perm_1_promoted = VirtualCactusGroup(MY_N)
+    perm_1_promoted *= perm_1
+
+    for p in range(1, MY_N):
+        for q in range(p+1, MY_N+1):
+            maybe_k_shift = perm_1.preserves_intervalness(p,q)
+            if maybe_k_shift is None:
+                assert p==1 or p==2
+                continue
+            else:
+                assert p>2
+                assert maybe_k_shift == 0
+            expected_rhs = VirtualCactusGroup(MY_N)
+            expected_rhs_cactus = s_gens[(p+maybe_k_shift,q+maybe_k_shift)]
+            expected_rhs *= expected_rhs_cactus
+            spq = s_gens[(p, q)]
+            lhs = perm_1_promoted*spq
+            lhs /= perm_1_promoted
+            assert lhs==expected_rhs
+
+    perm_1.element = list(range(3,MY_N+3))
+    perm_1.element[-1] = 2
+    perm_1.element[-2] = 1
+    perm_1_promoted = VirtualCactusGroup(MY_N)
+    perm_1_promoted *= perm_1
+
+    for p in range(1, MY_N):
+        for q in range(p+1, MY_N+1):
+            maybe_k_shift = perm_1.preserves_intervalness(p,q)
+            if maybe_k_shift is None:
+                continue
+            else:
+                assert maybe_k_shift == 2 or maybe_k_shift == -3
+            expected_rhs = VirtualCactusGroup(MY_N)
+            expected_rhs_cactus = s_gens[(p+maybe_k_shift,q+maybe_k_shift)]
+            expected_rhs *= expected_rhs_cactus
+            spq = s_gens[(p, q)]
+            lhs = perm_1_promoted*spq
+            lhs /= perm_1_promoted
+            assert lhs==expected_rhs
+
 def test_random_iden() -> None:
     """
     produce a random element of vJ_3 and check that
@@ -132,4 +208,5 @@ def test_random_iden() -> None:
         lhs_vcact = VirtualCactusGroup.random(MY_N,MY_CACT_LEN,my_len)
         lhs_vcact *= lhs_vcact.inv()
         if lhs_vcact != iden_v:
+            # it might not simplify all the way to identity
             print(f"{lhs_vcact} with {my_len}")
