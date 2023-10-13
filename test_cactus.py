@@ -106,7 +106,7 @@ def test_perm_promoted() -> None:
 
 def test_cross_rels() -> None:
     """
-    the defining ws_ijw^-1 = s_wi,wj relations in vJ_3
+    the defining ws_ijw^-1 = s_wi,wj relations in vJ_5
     """
     MY_N = 5
 
@@ -182,7 +182,7 @@ def test_cross_rels() -> None:
 
 def test_random_iden() -> None:
     """
-    produce a random element of vJ_3 and check that
+    produce a random element of vJ_4 and check that
     x*x^-1 gives identity
     """
     MY_N = 4
