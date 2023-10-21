@@ -10,6 +10,8 @@ Mainly about quantum field theries in less than 3 spatial dimensions. For early 
 
 The sort of supersymmetric field theories that are referenced for pure math applications (particularly geometric representation theory). Particularly those appearing as descendents of Theory X in 6 dimensions.
 
+## Basic Book
+
 ## Accompanying Scripts
 
 Some of the concepts descibed in the books have accompanying scripts that demonstrate them.
