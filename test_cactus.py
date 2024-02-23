@@ -104,6 +104,7 @@ def test_perm_promoted() -> None:
     perm_12_promoted *= (perm_1*perm_2)
     assert perm_1_promoted*perm_2_promoted == perm_12_promoted
 
+#pylint:disable=too-many-branches,too-many-statements
 def test_cross_rels() -> None:
     """
     the defining ws_ijw^-1 = s_wi,wj relations in vJ_5
@@ -145,7 +146,9 @@ def test_cross_rels() -> None:
     for p in range(1, MY_N):
         for q in range(p+1, MY_N+1):
             maybe_k_shift = perm_1.preserves_intervalness(p,q)
+            #pylint:disable=no-else-continue
             if maybe_k_shift is None:
+                #pylint:disable=consider-using-in
                 assert p==1 or p==2
                 continue
             else:
@@ -168,9 +171,11 @@ def test_cross_rels() -> None:
     for p in range(1, MY_N):
         for q in range(p+1, MY_N+1):
             maybe_k_shift = perm_1.preserves_intervalness(p,q)
+            #pylint:disable=no-else-continue
             if maybe_k_shift is None:
                 continue
             else:
+                #pylint:disable=consider-using-in
                 assert maybe_k_shift == 2 or maybe_k_shift == -3
             expected_rhs = VirtualCactusGroup(MY_N)
             expected_rhs_cactus = s_gens[(p+maybe_k_shift,q+maybe_k_shift)]

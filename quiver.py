@@ -6,6 +6,7 @@ TODO : path algebra multiplication order check
 from functools import reduce
 from typing import Callable, Dict, List, Optional, Set, Tuple, Union, cast
 import numpy as np
+#pylint:disable=import-error
 from sympy import symbols, Expr
 
 # pylint:disable = unnecessary-lambda, unnecessary-lambda-assignment,too-many-instance-attributes
