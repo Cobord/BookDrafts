@@ -161,10 +161,9 @@ class QuiverRepresentation:
             raise ValueError("Only for paths of nonzero length")
         return reduce(lambda acc, edge_name: np.matmul(acc, self._edge_matrices[edge_name]), factors[1:], self._edge_matrices[factors[0]])
 
-
 def FormalLinearCombination(t: type, base_ring: type,
-                            zero_base_ring: 'base_ring',
-                            ts_mul: Callable[['t', 't'], 't']):
+                            zero_base_ring: 'base_ring', #pyright: ignore [reportUndefinedVariable]
+                            ts_mul: Callable[['t', 't'], 't']): #pyright: ignore [reportUndefinedVariable]
     """
     t is any type, if you want __mul__ to have meaning then you have to say it is a semigroup with the provided ts_mul for t's multiplication
        if you don't intend to call __mul__ ever you can put something dummy there like ts_mul = lambda z1,z2 = z2, but it will never be utilized
@@ -177,7 +176,7 @@ def FormalLinearCombination(t: type, base_ring: type,
         a formal linear combination of t's with base_ring coefficients
         """
 
-        def __init__(self, element_list: List[Tuple[base_ring, t]]):
+        def __init__(self, element_list: List[Tuple[base_ring, t]]): #pyright: ignore
             """
             initialize from a list of pairs
             """
@@ -432,7 +431,7 @@ class PathAlgebra:
         noncyclic_part_wrapped.element = noncyclic_part
         return (cyclic_part_wrapped, noncyclic_part_wrapped)
 
-    def cyclic_derivative(self, wrt_edge: Union[str, 'FormalLinearCombinationT']) -> 'PathAlgebra':
+    def cyclic_derivative(self, wrt_edge: Union[str, 'FormalLinearCombinationT']) -> 'PathAlgebra': #pyright: ignore [reportUndefinedVariable]
         """
         cyclic derivative with respect to either the dual basis vector which is 1 only on the edge labelled=wrt_edge
         or wrt_edge is a linear combination of such strings and the derivative extends linearly
@@ -478,6 +477,7 @@ class PathAlgebra:
             other_complex = other
             scalar_mult = True
         if scalar_mult:
+            #pylint:disable=possibly-used-before-assignment
             new_element = self.element * other_complex
             ret_val = PathAlgebra(self._quiver, [])
             ret_val.element = new_element
@@ -507,6 +507,7 @@ class PathAlgebra:
             other_complex = other
             scalar_mult = True
         if scalar_mult:
+            #pylint:disable=possibly-used-before-assignment
             self.element *= other_complex
         elif isinstance(other, PathAlgebra):
             assert self._quiver == other._quiver
